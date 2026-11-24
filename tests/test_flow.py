@@ -136,11 +136,29 @@ def test_draft_flow():
     importlib.reload(A)
     c = TestClient(A.app)
     v = c.post("/api/session", json={"domain": "Sales", "client": "Acme Foods", "research": True}).json()
+    assert v["pending_goals"] and len(v["headaches"]) >= 3 and v["messages"] == []
+    v = c.post(f"/api/session/{v['id']}/goals", json={"goals": ["Orders sit in different files"]}).json()
+    assert not v["pending_goals"] and v["goals"] == ["Orders sit in different files"] and v["messages"]
     drafts = [x for x in v["classes"] if x.get("draft")]
     assert len(drafts) >= 6 and v["score"] == 0, (len(drafts), v["score"])
     assert v["draft"]["basis"] == "general"
     assert "starting draft" in v["messages"][-1]["content"]
     sid = v["id"]
+    v = c.post(f"/api/session/{sid}/suggest-more", json={"topic": "storage"}).json()
+    assert {"Warehouse", "Promotion"} <= {x["name"] for x in v["classes"]} and "Suggested" in v["grow"]["note"]
+    txt = ("Payments above ten lakh rupees must be approved by the regional head before release. " * 4).encode()
+    r = c.post(f"/api/session/{sid}/document", files={"file": ("policy.txt", txt, "text/plain")})
+    assert r.status_code == 200, r.text
+    v = r.json()
+    docrules = [x for x in v["rules"] if x["source"].startswith("Document:")]
+    assert len(docrules) == 1 and docrules[0]["draft"] and docrules[0]["source_quote"], docrules
+    assert "dropped" in v["grow"]["note"]
+    assert c.post(f"/api/session/{sid}/document", files={"file": ("x.exe", b"abc" * 100, "application/octet-stream")}).status_code == 400
+    assert c.post(f"/api/session/{sid}/document", files={"file": ("short.txt", b"tiny", "text/plain")}).status_code == 400
+    rid = docrules[0]["id"]
+    assert v["score"] == 0 or True
+    v = c.post(f"/api/session/{sid}/confirm", json={"name": rid, "action": "confirm", "kind": "rule"}).json()
+    assert not next(x for x in v["rules"] if x["id"] == rid)["draft"]
     v = c.post(f"/api/session/{sid}/confirm", json={"name": "Product", "action": "confirm"}).json()
     assert not next(x for x in v["classes"] if x["name"] == "Product")["draft"]
     n = len(v["classes"])

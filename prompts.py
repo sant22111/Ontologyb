@@ -62,9 +62,42 @@ Team notes: {about or "(none)"}
 If you have a web search tool, use it to read public information about this client (its website, annual report, investor material, products, sales channels, systems and regulation that apply). If you find nothing specific, base the draft on what is typical for this kind of business and say so.
 Everything you produce is an UNCONFIRMED GUESS for the client to confirm or correct. Never invent figures, names of people, or internal systems you have no basis for.
 
-Reply with ONLY JSON: {{"basis":"web or general","summary":"two plain sentences: what the draft covers and what it is based on","delta":{{...}}}}
+Reply with ONLY JSON: {{"basis":"web or general","summary":"two plain sentences: what the draft covers and what it is based on","headaches":["6 to 8 everyday problems, in the client's own business language, that a business like this typically has and a shared map would help with. Specific to this client's world, no jargon, each under 20 words"],"delta":{{...}}}}
 {DELTA_SPEC}
 Overrides for the draft: leave source_quote empty everywhere. Give 8 to 12 classes, 8 to 14 relationships, and 2 to 4 properties for each of the 5 most important classes. Do not include rules. Never use these words in descriptions: {BANNED}"""
+
+
+def enrich_system(context_block, client, about, goals, topic):
+    return f"""You are extending an existing business map with a few more things the client has not mentioned yet. If you have a web search tool, use it to read public information about the client and the topic.
+Client: {client or "(not named)"}. Team notes: {about or "(none)"}.{goals_block(goals)}
+Focus: {topic or "whatever important parts of this business the map is still missing"}
+CURRENT MAP:
+{context_block}
+
+Propose ADDITIONS ONLY: 3 to 8 new classes, their connections to things already on the map, and 2 to 3 details for the new ones. Do not repeat or reword anything already on the map. Everything is an unconfirmed guess for the client to keep or remove. Never invent figures or names. Leave source_quote empty. Do not include rules. Never use these words in descriptions: {BANNED}
+Reply with ONLY JSON: {{"summary":"one plain sentence on what you added and why","delta":{{...}}}}
+{DELTA_SPEC}"""
+
+
+def doc_system(context_block, client, filename, text):
+    return f"""You are reading a document the client shared and extracting what it says about how their business works, to add to their business map.
+Client: {client or "(not named)"}. Document: {filename}
+CURRENT MAP (do not repeat what is already there):
+{context_block}
+
+Rules for extraction:
+- Use ONLY what the document says. Never add outside knowledge.
+- For every class, relationship and rule, set source_quote to an exact, verbatim sentence or phrase from the document (max 25 words, copied character for character). Anything without a real quote will be discarded.
+- Include rules the document states: who decides (authority), deadlines and expiries (time), exceptions, compliance limits. Rules must have applies_to naming classes.
+- 3 to 10 classes, their relationships, 2 to 3 details for the important ones, and as many rules as the document clearly states.
+- Never use these words in descriptions: {BANNED}
+Reply with ONLY JSON: {{"summary":"two plain sentences on what the document covers","delta":{{...}}}}
+{DELTA_SPEC}
+
+DOCUMENT TEXT (between the markers):
+<<<START>>>
+{text}
+<<<END>>>"""
 
 
 def draft_block(names):

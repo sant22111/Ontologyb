@@ -301,17 +301,12 @@ def apply_delta(st, delta, source, overwrite=False):
 
 
 # ---------------------------------------------------------------- scoring
-def mark_draft(st):
-    """Everything added by the research step is an unconfirmed guess until the client says so."""
-    for c in st["classes"].values():
-        if c.get("source") == "draft":
-            c["draft"] = True
-    for r in st["relationships"]:
-        if r.get("source") == "draft":
-            r["draft"] = True
-    for p in st["properties"]:
-        if p.get("source") == "draft":
-            p["draft"] = True
+def mark_draft(st, source="draft"):
+    """Everything added by research or from a document is an unconfirmed guess until the client says so."""
+    for coll in (st["classes"].values(), st["relationships"], st["properties"], st["rules"]):
+        for x in coll:
+            if x.get("source") == source:
+                x["draft"] = True
 
 
 def confirmed_view(st):
@@ -321,26 +316,37 @@ def confirmed_view(st):
     cl = {k: v for k, v in st["classes"].items() if not v.get("draft")}
     return {**st, "classes": cl,
             "relationships": [r for r in st["relationships"] if r["from"] in cl and r["to"] in cl],
-            "properties": [p for p in st["properties"] if p["class"] in cl]}
+            "properties": [p for p in st["properties"] if p["class"] in cl],
+            "rules": [r for r in st["rules"] if not r.get("draft")]}
 
 
-def confirm_or_remove(st, name, action):
+def confirm_or_remove(st, name, action, kind="class"):
+    if action == "confirm_all":
+        n = 0
+        for coll in (st["classes"].values(), st["rules"]):
+            for x in coll:
+                if x.get("draft"):
+                    x["draft"] = False
+                    n += 1
+        log(st, "confirm", f"Client confirmed {n} drafted items")
+        return True
+    if kind == "rule":
+        r = next((x for x in st["rules"] if x["id"] == name), None)
+        if not r:
+            return False
+        if action == "confirm":
+            r["draft"] = False
+            log(st, "confirm", f"Client confirmed rule {name}")
+        else:
+            st["rules"] = [x for x in st["rules"] if x["id"] != name]
+            log(st, "remove", f"Client removed drafted rule {name}")
+        return True
     k = find_class(st, name)
-    if not k and action != "confirm_all":
+    if not k:
         return False
     if action == "confirm":
         st["classes"][k]["draft"] = False
-        st["classes"][k]["source"] = "Confirmed by the client"
         log(st, "confirm", f"Client confirmed '{k}'")
-        return True
-    if action == "confirm_all":
-        n = 0
-        for c in st["classes"].values():
-            if c.get("draft"):
-                c["draft"] = False
-                c["source"] = "Confirmed by the client"
-                n += 1
-        log(st, "confirm", f"Client confirmed {n} drafted things")
         return True
     apply_delta(st, {"remove": {"classes": [k]}}, "Removed by the client")
     return True
@@ -457,7 +463,7 @@ def context_block(st, max_chars=6000):
         lines.append(f"- {r['from']} -{r['name']}-> {r['to']}")
     lines.append("RULES:")
     for r in st["rules"]:
-        lines.append(f"- [{r['category']}] {r['text']}")
+        lines.append(f"- [{r['category']}] {r['text']}" + (" [DRAFT, not confirmed]" if r.get("draft") else ""))
     out = "\n".join(lines)
     return out[:max_chars] if len(out) > max_chars else out
 
@@ -603,10 +609,10 @@ def view(st, include_messages=True):
         "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "client": st.get("client", ""), "about": st.get("about", ""), "created": st["created"], "updated": st["updated"],
         "template": st["template"], "classes": list(st["classes"].values()), "relationships": st["relationships"],
         "properties": st["properties"], "rules": st["rules"], "questions": st["questions"], "story": st["story"],
-        "sample": st["sample"], "draft": st.get("draft"), "goals": st.get("goals", []), "usecases": usecases_view(st), "changelog": st["changelog"][-60:], **s,
+        "sample": st["sample"], "draft": st.get("draft"), "pending_goals": st.get("pending_goals", False), "headaches": st.get("headaches", []), "goals": st.get("goals", []), "usecases": usecases_view(st), "changelog": st["changelog"][-60:], **s,
         "counts": {"things": len(st["classes"]), "connections": len(st["relationships"]), "details": len(st["properties"]),
                    "rules": len(st["rules"]), "questions": len(st["questions"]),
-                   "drafts": sum(1 for c in st["classes"].values() if c.get("draft"))},
+                   "drafts": sum(1 for c in st["classes"].values() if c.get("draft")) + sum(1 for r in st["rules"] if r.get("draft"))},
     }
     if include_messages:
         v["messages"] = st["messages"]

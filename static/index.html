@@ -21,7 +21,7 @@ input:focus,textarea:focus,select:focus{outline:2px solid #bcd2f5;border-color:v
 [hidden]{display:none!important}
 .mute{color:var(--mute)}
 /* landing */
-#landing{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+#landing,#pick{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
 .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px;max-width:560px;width:100%;box-shadow:0 6px 30px rgba(0,51,141,.06)}
 .card h1{margin:0 0 4px;font-size:26px;color:var(--blue)}
 .card label{display:block;font-weight:600;margin:16px 0 6px}
@@ -104,6 +104,8 @@ ul.tight{margin:4px 0 0;padding-left:18px}
 .edge text{font-size:9px;fill:#6B7794;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
 .dim{opacity:.12}.hot path{stroke:var(--blue2);stroke-width:2.6}.hot text{fill:var(--blue)}
 .node.stub circle{stroke-dasharray:3 2;stroke:#C27A00}
+.growrow{display:flex;gap:6px;align-items:center;margin:6px 0}
+.growrow input[type=text]{flex:1}
 .node.draft circle{stroke-dasharray:4 3;stroke:#0091DA;stroke-width:2;fill-opacity:.4}
 .edge.draft path{stroke-dasharray:4 3}
 #mnav,#bbtn{display:none}
@@ -115,7 +117,6 @@ ul.tight{margin:4px 0 0;padding-left:18px}
  .badges{display:none;order:9;flex-basis:100%}
  .badges.open{display:flex}
  .hdr-actions{margin-left:auto}
- #reveal{display:none}
  main{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr);padding:8px}
  #app:not(.mv) #rightp{display:none}
  #app.mv #leftp{display:none}
@@ -139,8 +140,8 @@ ul.tight{margin:4px 0 0;padding-left:18px}
     <label for="domain">What area are we mapping?</label>
     <input id="domain" placeholder="e.g. Retail banking fraud, GST litigation, Telecom compliance" maxlength="120">
     <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:500"><input type="checkbox" id="research" checked style="width:auto;margin-top:3px"><span>Prepare a starting draft from public information about this client<span class="mute" style="display:block;font-weight:400;font-size:12px">Takes up to a minute. The AI reads public web pages and pre-fills a base map. Everything starts as a dashed guess, and the client confirms or corrects it. Needs a client name.</span></span></label>
-    <label>What would you most like to fix? <span class="mute" style="font-weight:400">(pick up to 3)</span></label>
-    <div id="goals" style="margin-top:4px"></div>
+    <div id="goalsbox"><label>What would you most like to fix? <span class="mute" style="font-weight:400">(pick up to 3)</span></label>
+    <div id="goals" style="margin-top:4px"></div></div>
     <label for="about">Anything we should know? <span class="mute" style="font-weight:400">(optional)</span></label>
     <textarea id="about" rows="2" maxlength="1200" placeholder="e.g. sells through 40 distributors, uses SAP and a DMS, trade spend is a worry"></textarea>
     <label for="owner">Your name or team <span class="mute" style="font-weight:400">(optional)</span></label>
@@ -155,6 +156,15 @@ ul.tight{margin:4px 0 0;padding-left:18px}
   </div>
 </div>
 
+<div id="pick" hidden>
+  <div class="card">
+    <h1>Here's what I found</h1>
+    <div class="mute" id="pickinfo"></div>
+    <h4 style="margin:18px 0 4px;font-size:15px">Which of these sounds like your problem? <span class="mute" style="font-weight:400">(pick up to 3)</span></h4>
+    <div id="pickgoals"></div>
+    <div style="margin-top:14px;display:flex;gap:8px"><button class="btn" id="pickgo">Start the workshop</button><button class="btn ghost" id="pickskip">Skip</button></div>
+  </div>
+</div>
 <div id="app" hidden>
   <header>
     <div><div class="brand">Business Map Studio</div><div class="dom" id="hdom"></div></div>
@@ -189,6 +199,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
           <svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9aa7c2"/></marker></defs><g id="vp"><g id="gl"></g><g id="gn"></g></g></svg>
           <div class="tool">
             <button class="btn ghost sm" id="fit">Fit</button>
+            <button class="btn sm" id="grow">＋ Grow</button>
             <button class="btn ghost sm" id="ex">Show example data</button>
             <button class="btn ghost sm" id="clr" hidden>Clear highlight</button>
           </div>
@@ -235,11 +246,23 @@ async function initLanding(){
 $('#begin').onclick=async()=>{
   const domain=$('#domain').value.trim(); if(!domain){$('#domain').focus();return}
   $('#begin').disabled=true;$('#begin').textContent=($('#research').checked&&$('#client').value.trim())?'Researching the client… up to a minute':'Starting…';
-  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,research:$('#research').checked&&!!$('#client').value.trim(),goals:[...document.querySelectorAll('#goals input:checked')].map(i=>i.value),template:$('#tpl').value||null});enter(v)}
+  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,research:$('#research').checked&&!!$('#client').value.trim(),goals:[...document.querySelectorAll('#goals input:checked')].map(i=>i.value),template:$('#tpl').value||null});v.pending_goals?showPick(v):enter(v)}
   catch(e){err(e)} finally{$('#begin').disabled=false;$('#begin').textContent='Begin'}
 };
 $('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
-async function openSession(id){try{enter(await api('/session/'+id))}catch(e){err(e)}}
+function syncGoalsBox(){$('#goalsbox').hidden=$('#research').checked&&!!$('#client').value.trim()}
+$('#research').onchange=syncGoalsBox;$('#client').addEventListener('input',syncGoalsBox);syncGoalsBox();
+function goalList(el,items){el.innerHTML=items.map(g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`).join('');el.onchange=()=>{const on=el.querySelectorAll('input:checked').length;el.querySelectorAll('input:not(:checked)').forEach(i=>i.disabled=on>=3)}}
+function showPick(v){
+  sid=v.id;$('#landing').hidden=true;$('#app').hidden=true;$('#pick').hidden=false;
+  const d=v.draft||{};
+  $('#pickinfo').textContent=(d.basis==='web'?`I read ${d.sources.length} public web page(s) about ${v.client} and built a starting draft of ${v.counts.things} things. `:d.basis==='general'?`I could not read web pages, so I built a starting draft of ${v.counts.things} things from general knowledge of this kind of business. `:'I could not prepare a draft this time, so here are common problems instead. ')+(d.summary||'')+' Everything is a guess you will confirm or correct next.';
+  goalList($('#pickgoals'),(v.headaches&&v.headaches.length)?v.headaches:GOALS);
+}
+async function finishPick(skip){const goals=skip?[]:[...document.querySelectorAll('#pickgoals input:checked')].map(i=>i.value);$('#pickgo').disabled=true;$('#pickgo').textContent='Starting…';
+  try{const v=await api(`/session/${sid}/goals`,'POST',{goals});$('#pick').hidden=true;enter(v)}catch(e){err(e)}finally{$('#pickgo').disabled=false;$('#pickgo').textContent='Start the workshop'}}
+$('#pickgo').onclick=()=>finishPick(false);$('#pickskip').onclick=()=>finishPick(true);
+async function openSession(id){try{const v=await api('/session/'+id);v.pending_goals?showPick(v):enter(v)}catch(e){err(e)}}
 $('#home').onclick=()=>{$('#app').hidden=true;$('#landing').hidden=false;sid=null;initLanding()};
 
 function enter(v){
@@ -257,7 +280,7 @@ function render(v,first){
   $('#badges').innerHTML=v.badges.map(b=>`<span class="badge ${b.earned?'on':''}" title="${esc(b.hint)}">${b.earned?'★ ':''}${esc(b.name)}</span>`).join('');
   $('#counts').textContent=`${v.counts.things} things · ${v.counts.connections} connections · ${v.counts.rules} rules`;
   $('#steps').innerHTML=[1,2,3,4,5].map(n=>{const names={1:'Your world',2:'Connect the dots',3:'Rules of the game',4:'Test it',5:'Complete'};return `<div class="step ${n<v.stage?'done':n===v.stage?'now':''}">${n<v.stage?'✓ ':''}${n}. ${names[n]}</div>`}).join('');
-  $('#reveal').hidden=v.score<60;
+  $('#reveal').hidden=v.score<60;growLabel();
   renderChat(v);
   GR.sync();
   if(tab==='arena')renderArena();
@@ -310,10 +333,40 @@ function showView(v){
 $('#navchat').onclick=()=>showView('chat');$('#navmap').onclick=()=>showView('map');
 $('#bbtn').onclick=e=>{e.stopPropagation();$('#badges').classList.toggle('open')};
 
+const srcLabel=s=>s==='draft'?'Public information (draft)':(s||'');
+/* ---------------- grow the map ---------------- */
+function growLabel(){const n=S&&S.counts.drafts||0;$('#grow').textContent=n?`＋ Grow · ${n} to review`:'＋ Grow'}
+function openGrow(){
+  const d=$('#drawer'),n=S.counts.drafts||0;
+  d.hidden=false;
+  d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button>
+  <h3>Grow your map</h3><div class="mute">New items arrive as dashed drafts. You keep or remove each one.</div>
+  ${n?`<div class="sect" style="background:#EAF6FD;border:1px solid #0091DA;border-radius:8px;padding:8px 10px;margin:10px 0"><b>${n} item(s) waiting for your review.</b><div style="margin-top:6px"><button class="btn sm" id="gorev">Review them</button></div></div>`:''}
+  <h4>Suggest more</h4><div class="mute" style="font-size:13px">The AI looks for what is missing. Name a topic to focus it.</div>
+  <div class="growrow"><input type="text" id="smtopic" placeholder="e.g. gas pricing, vendors (optional)" maxlength="200"><button class="btn sm" id="smgo">Suggest</button></div>
+  <h4>Add from a document</h4><div class="mute" style="font-size:13px">Upload a policy, process note or annual report (PDF, Word or text, up to 10 MB). The AI adds what the document says, each with a quote from it. The file is sent to the AI model and is not stored. Only upload what the client has agreed to share.</div>
+  <div class="growrow"><input type="file" id="docfile" accept=".pdf,.docx,.txt,.md" style="flex:1;min-width:0"><button class="btn sm" id="docgo">Read it</button></div>
+  <div class="mute" style="font-size:12px">The first ~30,000 characters (about 15 pages) are read. For long files, upload the sections that matter.</div>`;
+  if(n)$('#gorev').onclick=openReview;
+  $('#smgo').onclick=async()=>{const b=$('#smgo');b.disabled=true;b.textContent='Researching…';try{const v=await api(`/session/${sid}/suggest-more`,'POST',{topic:$('#smtopic').value});render(v);toast(v.grow.note);openReview()}catch(e){err(e);b.disabled=false;b.textContent='Suggest'}};
+  $('#docgo').onclick=async()=>{const f=$('#docfile').files[0];if(!f)return toast('Choose a file first');const b=$('#docgo');b.disabled=true;b.textContent='Reading…';
+    try{const fd=new FormData();fd.append('file',f);const r=await fetch(`/api/session/${sid}/document`,{method:'POST',body:fd});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.detail||'Upload failed');render(j);toast(j.grow.note);openReview()}catch(e){err(e);b.disabled=false;b.textContent='Read it'}};
+}
+function openReview(){
+  const d=$('#drawer');const cls=S.classes.filter(c=>c.draft),rules=S.rules.filter(r=>r.draft);d.hidden=false;
+  if(!cls.length&&!rules.length){d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button><h3>Nothing to review</h3><div class="mute">Every item is confirmed.</div>`;return}
+  d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button><h3>Review drafts</h3><div class="mute">Keep what is right for you. Remove what is not.</div>
+  <div style="margin:8px 0"><button class="btn sm" id="keepall">Keep all (${cls.length+rules.length})</button></div>
+  ${cls.length?'<h4>Things</h4>':''}${cls.map(c=>`<div class="q"><b>${esc(c.name)}</b> <span class="mute">${esc(c.layer||'')}</span><div style="font-size:13px">${esc(c.description)}</div>${c.source_quote?`<div class="quote" style="font-size:12px">“${esc(c.source_quote)}”</div>`:''}<div class="mute" style="font-size:12px">${esc(srcLabel(c.source))}</div><div style="margin-top:6px;display:flex;gap:6px"><button class="btn sm rv" data-a="confirm" data-k="class" data-n="${esc(c.name)}">Keep</button><button class="btn ghost sm rv" data-a="remove" data-k="class" data-n="${esc(c.name)}">Remove</button></div></div>`).join('')}
+  ${rules.length?'<h4>Rules</h4>':''}${rules.map(r=>`<div class="q"><span class="pill">${esc(r.category)}</span> ${esc(r.text)}${r.source_quote?`<div class="quote" style="font-size:12px">“${esc(r.source_quote)}”</div>`:''}<div class="mute" style="font-size:12px">${esc(srcLabel(r.source))}</div><div style="margin-top:6px;display:flex;gap:6px"><button class="btn sm rv" data-a="confirm" data-k="rule" data-n="${esc(r.id)}">Keep</button><button class="btn ghost sm rv" data-a="remove" data-k="rule" data-n="${esc(r.id)}">Remove</button></div></div>`).join('')}`;
+  const go=async(b,body)=>{b.disabled=true;try{const v=await api(`/session/${sid}/confirm`,'POST',body);render(v);openReview()}catch(e){err(e);b.disabled=false}};
+  $('#keepall').onclick=e=>go(e.target,{action:'confirm_all'});
+  d.querySelectorAll('.rv').forEach(b=>b.onclick=()=>go(b,{name:b.dataset.n,action:b.dataset.a,kind:b.dataset.k}));
+}
+$('#grow').onclick=()=>{if(!S)return;if(S.counts.drafts&&!$('#drawer').hidden)return openGrow();openGrow()};
 /* ---------------- goals + use cases ---------------- */
 const GOALS=["I can't quickly trace something from start to finish (a product, a payment, a case)","Different teams give different answers to the same question","Audits and reporting take weeks of pulling data from different places","Deadlines, renewals or expiries sneak up on us","When something goes wrong, we can't quickly see who or what is affected","New joiners take months to learn how things connect","We want AI to answer questions about our business, but it gets things wrong"];
-$('#goals').innerHTML=GOALS.map(g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`).join('');
-$('#goals').addEventListener('change',()=>{const on=document.querySelectorAll('#goals input:checked').length;document.querySelectorAll('#goals input:not(:checked)').forEach(i=>i.disabled=on>=3)});
+goalList($('#goals'),GOALS);
 function renderUses(){
   const p=$('#p-uses');const u=S.usecases;
   if(!u){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">What you can do with this map</h4><div class="mute">Real questions your team could answer in seconds, how they are answered today, and what the map still needs for each.${S.goals&&S.goals.length?`<div style="margin-top:8px">Built around what you want to fix: <b>${S.goals.map(esc).join('; ')}</b></div>`:''}</div><button class="btn" id="ugo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Show me use cases</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}`;
@@ -452,7 +505,7 @@ async function openNode(n){
     <p>${esc(c.description)}</p>
     ${c.why?`<h4>Why it is here</h4><div>${esc(c.why)}</div>`:''}
     ${c.example?`<h4>Example</h4><div>${esc(c.example)}</div>`:''}
-    ${c.source_quote?`<h4>In your words</h4><div class="quote">“${esc(c.source_quote)}”</div><div class="mute" style="font-size:12px">Heard in: ${esc(c.source)}</div>`:`<div class="mute" style="font-size:12px;margin-top:8px">Heard in: ${esc(c.source)}</div>`}
+    ${c.source_quote?`<h4>In your words</h4><div class="quote">“${esc(c.source_quote)}”</div><div class="mute" style="font-size:12px">Heard in: ${esc(srcLabel(c.source))}</div>`:`<div class="mute" style="font-size:12px;margin-top:8px">Source: ${esc(srcLabel(c.source))}</div>`}
     <h4>Connections (${x.outgoing.length+x.incoming.length})</h4><ul class="tight">${[...x.outgoing,...x.incoming].map(rel).join('')||'<li class="mute">None yet</li>'}</ul>
     <h4>Details held</h4>${x.properties.length?`<ul class="tight">${x.properties.map(p=>`<li><b>${esc(p.name)}</b> <span class="mute">(${esc(p.type)})</span> ${esc(p.description)}</li>`).join('')}</ul>`:'<div class="mute">None yet</div>'}
     <h4>Rules that apply</h4>${x.rules.length?`<ul class="tight">${x.rules.map(r=>`<li><span class="pill">${esc(r.category)}</span> ${esc(r.text)}</li>`).join('')}</ul>`:'<div class="mute">None yet</div>'}

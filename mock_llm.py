@@ -96,6 +96,7 @@ def _norm(s):
 
 
 DRAFT = {
+    "headaches": ["Trade scheme costs are hard to link back to the shops they reached", "Distributor stock and shop orders sit in different files", "Nobody can quickly see which shops a sales rep covers"],
     "summary": "A typical consumer-goods map: products, the distributors and shops that carry them, and the orders and schemes between. Based on how this kind of business usually works.",
     "delta": {
         "classes": [
@@ -133,6 +134,21 @@ def respond(task, ctx):
     if task == "draft":
         import copy
         return copy.deepcopy(DRAFT)
+    if task == "enrich":
+        have = {c.lower() for c in classes}
+        add = [c for c in ("Warehouse", "Promotion") if c.lower() not in have]
+        return {"summary": "Added a few things typical for this kind of business.",
+                "delta": {"classes": [{"name": n, "layer": "General", "description": f"A {n.lower()} the business works with.", "why": "Commonly part of this kind of business.", "example": ""} for n in add],
+                          "relationships": [{"name": "USES", "from": "Order", "to": n, "description": f"An order may involve a {n.lower()}"} for n in add if "Order" in classes]}}
+    if task == "doc":
+        words = (ctx.get("text") or "").split()
+        if len(words) < 8:
+            return {"summary": "Nothing usable.", "delta": {}}
+        quote = " ".join(words[:8])
+        return {"summary": "A short document.", "delta": {
+            "classes": [{"name": "PolicyDocument", "layer": "Documents", "description": "A document the client shared.", "why": "Source of rules.", "example": "", "source_quote": quote}],
+            "rules": [{"text": "Stated in the document: " + quote, "category": "compliance", "applies_to": ["PolicyDocument"], "source_quote": quote},
+                      {"text": "An invented rule that the document never says", "category": "business", "applies_to": ["PolicyDocument"], "source_quote": "this phrase does not appear anywhere in it"}]}}
     if task == "interview" and ctx.get("drafts") and ctx.get("turn", 0) == 0:
         return {"reply": "I prepared a starting draft from public information. It has things like Product, Distributor and Retailer. Do those look right for you?",
                 "chips": ["Yes, those are right", "Mostly, but we differ", "Not really"], "captured": "", "delta": {}}

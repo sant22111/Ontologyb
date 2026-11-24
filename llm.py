@@ -113,11 +113,11 @@ class LLM:
         raise LLMError(f"model did not return valid JSON: {last}")
 
 
-    def research(self, system, user, context=None):
+    def research(self, system, user, context=None, task="draft"):
         """Draft step. With the Anthropic provider it may use web search. Returns (object, source_urls)."""
         if self.provider == "mock":
             from mock_llm import respond
-            return respond("draft", context or {}), []
+            return respond(task, context or {}), []
         if self.provider == "anthropic":
             try:
                 import anthropic
@@ -137,7 +137,7 @@ class LLM:
                 return extract_json(text), urls
             except Exception:
                 pass  # fall back to the model's own knowledge below
-        return self.json("draft", system, [{"role": "user", "content": user}], max_tokens=6000), []
+        return self.json(task, system, [{"role": "user", "content": user}], max_tokens=6000, context=context), []
 
 
 llm = LLM()

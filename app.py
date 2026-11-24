@@ -8,7 +8,7 @@ import secrets
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -28,6 +28,7 @@ def _load_env():
 
 _load_env()
 
+import docs  # noqa: E402
 import excel  # noqa: E402
 import ontology as ont  # noqa: E402
 import prompts as P  # noqa: E402
@@ -133,6 +134,7 @@ def build_draft(st):
         ont.mark_draft(st)
         st["draft"] = {"basis": "web" if urls else "general", "sources": urls,
                        "summary": str(obj.get("summary", ""))[:400] if isinstance(obj, dict) else ""}
+        st["headaches"] = [str(h)[:160] for h in (obj.get("headaches") or []) if isinstance(h, str)][:8] if isinstance(obj, dict) else []
         ont.log(st, "draft", "Starting draft prepared (" + (f"{len(urls)} public web pages: " + "; ".join(urls) if urls else "general knowledge only, no web pages read") + ")")
     except Exception as e:  # the workshop still works without the draft
         st["draft"] = {"basis": "none", "sources": [], "error": str(e)[:200]}
@@ -220,14 +222,115 @@ def create(body: NewSession):
     with _lock(st["id"]):
         if body.research and st["client"]:
             build_draft(st)
-        interview_turn(st, None)
+            st["pending_goals"] = True  # the client picks what to fix before the workshop opens
+        else:
+            interview_turn(st, None)
         save(st)
     return present(st)
+
+
+class Goals(BaseModel):
+    goals: list[str] = []
+
+
+@app.post("/api/session/{sid}/goals")
+def set_goals(sid: str, body: Goals):
+    with _lock(sid):
+        st = load(sid)
+        st["goals"] = [g.strip()[:200] for g in body.goals if g.strip()][:3]
+        if st.get("pending_goals"):
+            st["pending_goals"] = False
+            interview_turn(st, None)
+        save(st)
+    return present(st)
+
+
+class More(BaseModel):
+    topic: str = ""
+
+
+def _grow_note(res, label):
+    a = res["added"]
+    return f"{label}: +{a['classes']} things, +{a['relationships']} connections, +{a['properties']} details, +{a['rules']} rules. Review them and keep or remove each."
+
+
+@app.post("/api/session/{sid}/suggest-more")
+def suggest_more(sid: str, body: More):
+    with _lock(sid):
+        st = load(sid)
+        if not st["classes"]:
+            raise HTTPException(400, "Build a few things on the map first")
+        topic = body.topic.strip()[:200]
+        system = P.enrich_system(ont.context_block(st), st.get("client", ""), st.get("about", ""), st.get("goals"), topic)
+        try:
+            obj, urls = llm.research(system, f"Client: {st.get('client') or st['domain']}\nFocus: {topic or 'anything important missing'}", {"classes": list(st["classes"].keys())}, task="enrich")
+        except LLMError as e:
+            raise HTTPException(502, str(e))
+        delta = obj.get("delta") if isinstance(obj, dict) and isinstance(obj.get("delta"), dict) else {}
+        for k in ("rules", "remove", "rename", "confirm"):
+            delta.pop(k, None)
+        res = ont.apply_delta(st, delta, "draft")
+        ont.mark_draft(st, "draft")
+        ont.log(st, "suggest more", (f"Focus: {topic}. " if topic else "") + ("Read " + str(len(urls)) + " public pages: " + "; ".join(urls) if urls else "From general knowledge, no web pages read"))
+        save(st)
+    v = present(st)
+    v["grow"] = {"note": _grow_note(res, "Suggested"), "summary": str(obj.get("summary", ""))[:300] if isinstance(obj, dict) else "", "basis": "web" if urls else "general"}
+    return v
+
+
+@app.post("/api/session/{sid}/document")
+async def add_document(sid: str, file: UploadFile = File(...)):
+    data = await file.read(docs.MAX_BYTES + 1)
+    try:
+        text = docs.extract_text(file.filename or "", data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception:
+        raise HTTPException(400, "Could not read that file. Try saving it as a text or Word file.")
+    text = text.strip()
+    if len(text) < 200:
+        raise HTTPException(400, "No readable text found. A scanned PDF needs to be converted to text first.")
+    truncated = len(text) > docs.MAX_CHARS
+    text = text[:docs.MAX_CHARS]
+    fname = (file.filename or "document")[:80]
+    with _lock(sid):
+        st = load(sid)
+        system = P.doc_system(ont.context_block(st), st.get("client", ""), fname, text)
+        res = ai("doc", system, [{"role": "user", "content": "Extract what the document says."}], {"text": text, "classes": list(st["classes"].keys())}, max_tokens=5000)
+        delta = res.get("delta") if isinstance(res.get("delta"), dict) else {}
+        for k in ("remove", "rename", "confirm"):
+            delta.pop(k, None)
+        # keep only quotes that really appear in the document; unverifiable rules are dropped
+        sq = docs.squash(text)
+        dropped = 0
+        for key in ("classes", "relationships", "rules"):
+            keep = []
+            for it in delta.get(key) or []:
+                if not isinstance(it, dict):
+                    continue
+                ok = docs.quote_in(sq, it.get("source_quote", ""))
+                if not ok:
+                    it["source_quote"] = ""
+                    if key == "rules":
+                        dropped += 1
+                        continue
+                keep.append(it)
+            delta[key] = keep
+        source = f"Document: {fname}"
+        out = ont.apply_delta(st, delta, source)
+        ont.mark_draft(st, source)
+        ont.log(st, "document", f"Read {fname} ({len(text)} characters{', first part only' if truncated else ''}). Added for review: {out['added']['classes']} things, {out['added']['relationships']} connections, {out['added']['rules']} rules" + (f". Dropped {dropped} rule(s) whose quote was not in the document" if dropped else ""))
+        save(st)
+    v = present(st)
+    v["grow"] = {"note": _grow_note(out, f"From {fname}") + (" Only the first part of the document was read." if truncated else "") + (f" {dropped} rule(s) were dropped because the AI could not back them with a quote from the document." if dropped else ""),
+                 "summary": str(res.get("summary", ""))[:300], "basis": "document"}
+    return v
 
 
 class Confirm(BaseModel):
     name: str = ""
     action: str  # confirm | confirm_all | remove
+    kind: str = "class"  # class | rule
 
 
 @app.post("/api/session/{sid}/confirm")
@@ -236,8 +339,8 @@ def confirm(sid: str, body: Confirm):
         raise HTTPException(400, "unknown action")
     st = load(sid)
     with _lock(sid):
-        if not ont.confirm_or_remove(st, body.name, body.action):
-            raise HTTPException(404, "No such thing on the map")
+        if not ont.confirm_or_remove(st, body.name, body.action, body.kind):
+            raise HTTPException(404, "No such item on the map")
         save(st)
     return present(st)
 
@@ -431,6 +534,9 @@ def export_xlsx(sid: str):
     for p in st["properties"]:
         if p["class"] in dr:
             p["description"] = tag + (p.get("description") or "")
+    for r in st["rules"]:
+        if r.get("draft"):
+            r["text"] = tag + r["text"]
     data = excel.build_workbook(st)
     name = "".join(ch if ch.isalnum() else "_" for ch in st["domain"])[:40] or "ontology"
     return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
