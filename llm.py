@@ -113,4 +113,31 @@ class LLM:
         raise LLMError(f"model did not return valid JSON: {last}")
 
 
+    def research(self, system, user, context=None):
+        """Draft step. With the Anthropic provider it may use web search. Returns (object, source_urls)."""
+        if self.provider == "mock":
+            from mock_llm import respond
+            return respond("draft", context or {}), []
+        if self.provider == "anthropic":
+            try:
+                import anthropic
+                if self._client is None:
+                    self._client = anthropic.Anthropic()
+                r = self._client.with_options(timeout=110).messages.create(
+                    model=self.model, max_tokens=6000, system=system,
+                    messages=[{"role": "user", "content": user}],
+                    tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 4}],
+                )
+                text = "".join(b.text for b in r.content if getattr(b, "type", "") == "text")
+                urls = []
+                for b in r.content:
+                    if getattr(b, "type", "") == "web_search_tool_result" and isinstance(b.content, list):
+                        urls += [x.url for x in b.content if getattr(x, "url", None)]
+                urls = list(dict.fromkeys(urls))[:8]
+                return extract_json(text), urls
+            except Exception:
+                pass  # fall back to the model's own knowledge below
+        return self.json("draft", system, [{"role": "user", "content": user}], max_tokens=6000), []
+
+
 llm = LLM()

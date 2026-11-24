@@ -87,6 +87,7 @@ def new_state(domain, template=None, owner="", client="", about=""):
         "properties": [],
         "rules": [],
         "questions": [],
+        "draft": None,
         "story": None,
         "sample": None,
         "changelog": [],
@@ -226,6 +227,15 @@ def apply_delta(st, delta, source, overwrite=False):
             added["classes"] += 1
             new_class_names.append(name)
 
+    # --- client confirms drafted items
+    cf = delta.get("confirm") if isinstance(delta.get("confirm"), dict) else {}
+    for n in cf.get("classes", []) or []:
+        k = find_class(st, n if isinstance(n, str) else (n or {}).get("name"))
+        if k and st["classes"][k].get("draft"):
+            st["classes"][k]["draft"] = False
+            st["classes"][k]["source"] = source
+            changed += 1
+
     # --- relationships
     for r in _dicts(delta.get("relationships")):
         name = snake_upper(r.get("name"))
@@ -289,6 +299,51 @@ def apply_delta(st, delta, source, overwrite=False):
 
 
 # ---------------------------------------------------------------- scoring
+def mark_draft(st):
+    """Everything added by the research step is an unconfirmed guess until the client says so."""
+    for c in st["classes"].values():
+        if c.get("source") == "draft":
+            c["draft"] = True
+    for r in st["relationships"]:
+        if r.get("source") == "draft":
+            r["draft"] = True
+    for p in st["properties"]:
+        if p.get("source") == "draft":
+            p["draft"] = True
+
+
+def confirmed_view(st):
+    """Score only what the client has confirmed. A drafted link or detail counts once its things are confirmed."""
+    if not any(c.get("draft") for c in st["classes"].values()):
+        return st
+    cl = {k: v for k, v in st["classes"].items() if not v.get("draft")}
+    return {**st, "classes": cl,
+            "relationships": [r for r in st["relationships"] if r["from"] in cl and r["to"] in cl],
+            "properties": [p for p in st["properties"] if p["class"] in cl]}
+
+
+def confirm_or_remove(st, name, action):
+    k = find_class(st, name)
+    if not k and action != "confirm_all":
+        return False
+    if action == "confirm":
+        st["classes"][k]["draft"] = False
+        st["classes"][k]["source"] = "Confirmed by the client"
+        log(st, "confirm", f"Client confirmed '{k}'")
+        return True
+    if action == "confirm_all":
+        n = 0
+        for c in st["classes"].values():
+            if c.get("draft"):
+                c["draft"] = False
+                c["source"] = "Confirmed by the client"
+                n += 1
+        log(st, "confirm", f"Client confirmed {n} drafted things")
+        return True
+    apply_delta(st, {"remove": {"classes": [k]}}, "Removed by the client")
+    return True
+
+
 def degree_map(st):
     deg = defaultdict(int)
     for r in st["relationships"]:
@@ -377,9 +432,10 @@ def compute_stage(st, connected):
 
 
 def summary(st):
-    score, breakdown, connected, detailed = compute_score(st)
-    badges = compute_badges(st, connected, detailed)
-    stage = compute_stage(st, connected)
+    cs = confirmed_view(st)
+    score, breakdown, connected, detailed = compute_score(cs)
+    badges = compute_badges(cs, connected, detailed)
+    stage = compute_stage(cs, connected)
     stubs = [k for k, v in st["classes"].items() if v.get("stub")]
     orphans = [k for k in st["classes"] if degree_map(st).get(k, 0) == 0]
     return {"score": score, "breakdown": breakdown, "badges": badges, "stage": stage, "stage_name": STAGE_NAMES[stage],
@@ -390,6 +446,8 @@ def context_block(st, max_chars=6000):
     lines = ["THINGS:"]
     for k, c in st["classes"].items():
         tag = " [not described yet]" if c.get("stub") else ""
+        if c.get("draft"):
+            tag += " [DRAFT, not confirmed by the client]"
         props = ", ".join(p["name"] for p in st["properties"] if p["class"] == k)
         lines.append(f"- {k} ({c.get('layer', '')}): {c.get('description', '')}{tag}" + (f" | details: {props}" if props else ""))
     lines.append("CONNECTIONS:")
@@ -527,7 +585,7 @@ def view(st, include_messages=True):
         "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "client": st.get("client", ""), "about": st.get("about", ""), "created": st["created"], "updated": st["updated"],
         "template": st["template"], "classes": list(st["classes"].values()), "relationships": st["relationships"],
         "properties": st["properties"], "rules": st["rules"], "questions": st["questions"], "story": st["story"],
-        "sample": st["sample"], "changelog": st["changelog"][-60:], **s,
+        "sample": st["sample"], "draft": st.get("draft"), "changelog": st["changelog"][-60:], **s,
         "counts": {"things": len(st["classes"]), "connections": len(st["relationships"]), "details": len(st["properties"]),
                    "rules": len(st["rules"]), "questions": len(st["questions"])},
     }

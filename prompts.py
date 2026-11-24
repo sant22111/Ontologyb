@@ -11,7 +11,7 @@ DELTA_SPEC = """
  "properties":    [{"class":"ClassName","name":"camelCase","type":"text|number|date|yes/no|list","description":"plain"}],
  "rules":         [{"text":"plain-language rule","category":"authority|time|exception|compliance|business","applies_to":["ClassName"],"source_quote":"client's words"}]
 }
-Optional: "remove":{"classes":[],"relationships":[],"rules":[]}, "rename":[{"from":"Old","to":"New"}]. Use empty lists when nothing applies.
+Optional: "confirm":{"classes":["Name"]} (items the client agreed are right), "remove":{"classes":[],"relationships":[],"rules":[]}, "rename":[{"from":"Old","to":"New"}]. Use empty lists when nothing applies.
 Relationship names are verbs (HOLDS, REPORTS_TO, CITES). Every relationship must use class names that exist in the map or in this same delta.
 """
 
@@ -33,11 +33,37 @@ NOTES FROM THE TEAM: {about or "(none)"}
 If you recognise this client or its type of business, use your general knowledge (products, sales channels, usual systems, regulation, typical problems) to ask sharper questions and to offer relevant chips. Treat everything you know about them as UNCONFIRMED guesses: phrase it as "I'd expect X, is that right?". Never state facts about the client as certain and never invent figures. Add to the map only what the client confirms in their answers or the team notes say."""
 
 
-def interview_system(domain, template_note, stage, context_block, stubs, client="", about=""):
+def draft_system(client, about, domain, template_note):
+    return f"""You are preparing a STARTING DRAFT of a business map BEFORE a workshop with a client, so the client can react to something instead of a blank page.
+Client: {client}
+Area: {domain}
+Team notes: {about or "(none)"}
+{template_note}
+
+If you have a web search tool, use it to read public information about this client (its website, annual report, investor material, products, sales channels, systems and regulation that apply). If you find nothing specific, base the draft on what is typical for this kind of business and say so.
+Everything you produce is an UNCONFIRMED GUESS for the client to confirm or correct. Never invent figures, names of people, or internal systems you have no basis for.
+
+Reply with ONLY JSON: {{"basis":"web or general","summary":"two plain sentences: what the draft covers and what it is based on","delta":{{...}}}}
+{DELTA_SPEC}
+Overrides for the draft: leave source_quote empty everywhere. Give 8 to 12 classes, 8 to 14 relationships, and 2 to 4 properties for each of the 5 most important classes. Do not include rules. Never use these words in descriptions: {BANNED}"""
+
+
+def draft_block(names):
+    if not names:
+        return ""
+    return f"""
+A STARTING DRAFT prepared from public information is on the map. Items marked [DRAFT] are guesses the client has NOT confirmed: never describe them as fact.
+Draft things: {", ".join(names)}.
+- If there is no client message yet, open by saying you prepared a starting draft from public information, name 3 or 4 of the main things, and ask whether those look right for them.
+- In the first turns walk the client through the draft a few things at a time ("Is X right for you?"). Put every thing the client agrees with in delta.confirm.classes. Wrong things go in delta.remove.classes. If they describe it differently, fix it through the delta. Also ask what the draft is missing.
+- Things the client adds themselves are confirmed and need no flag."""
+
+
+def interview_system(domain, template_note, stage, context_block, stubs, client="", about="", drafts=None):
     name, focus = STAGES[stage]
     return f"""You are a friendly senior business analyst running a live workshop with a client who is NOT technical.
 Area being mapped: {domain}.
-{template_note}{client_block(client, about)}
+{template_note}{client_block(client, about)}{draft_block(drafts)}
 
 Never use these words with the client: {BANNED}
 

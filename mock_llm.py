@@ -95,8 +95,47 @@ def _norm(s):
     return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
 
+DRAFT = {
+    "summary": "A typical consumer-goods map: products, the distributors and shops that carry them, and the orders and schemes between. Based on how this kind of business usually works.",
+    "delta": {
+        "classes": [
+            {"name": "Product", "layer": "Products", "description": "Something the company makes and sells.", "why": "Everything starts from what is sold.", "example": "A 200 ml hair oil"},
+            {"name": "Sku", "layer": "Products", "description": "One sellable pack size or variant of a product.", "why": "Stock and price are tracked per variant.", "example": "200 ml bottle"},
+            {"name": "Distributor", "layer": "Channel", "description": "A business that buys from the company and supplies shops.", "why": "Most sales flow through distributors.", "example": "A city distributor"},
+            {"name": "Retailer", "layer": "Channel", "description": "A shop that sells to shoppers.", "why": "Where products reach the shopper.", "example": "A neighbourhood store"},
+            {"name": "SalesRep", "layer": "People", "description": "A field person who visits shops and takes orders.", "why": "Drives coverage and orders.", "example": "A territory sales officer"},
+            {"name": "Order", "layer": "Sales", "description": "A request to buy products.", "why": "Links who bought what.", "example": "A weekly distributor order"},
+            {"name": "TradeScheme", "layer": "Sales", "description": "A discount or incentive offered to the trade.", "why": "Trade spend is a large cost.", "example": "Buy 10 get 1 free"},
+            {"name": "Region", "layer": "Places", "description": "A sales area such as a state or territory.", "why": "Targets and reports are by area.", "example": "North zone"},
+        ],
+        "relationships": [
+            {"name": "HAS_VARIANT", "from": "Product", "to": "Sku", "description": "A product comes in one or more variants", "why": ""},
+            {"name": "SUPPLIES", "from": "Distributor", "to": "Retailer", "description": "A distributor supplies many shops", "why": ""},
+            {"name": "VISITS", "from": "SalesRep", "to": "Retailer", "description": "A rep visits shops on a route", "why": ""},
+            {"name": "PLACED_BY", "from": "Order", "to": "Retailer", "description": "An order is placed by a shop", "why": ""},
+            {"name": "CONTAINS", "from": "Order", "to": "Sku", "description": "An order contains variants", "why": ""},
+            {"name": "FULFILLED_BY", "from": "Order", "to": "Distributor", "description": "A distributor fulfils the order", "why": ""},
+            {"name": "APPLIES_TO", "from": "TradeScheme", "to": "Sku", "description": "A scheme applies to some variants", "why": ""},
+            {"name": "COVERS", "from": "Distributor", "to": "Region", "description": "A distributor covers an area", "why": ""},
+        ],
+        "properties": [
+            {"class": "Sku", "name": "packSize", "type": "text", "description": "Size of the pack"},
+            {"class": "Sku", "name": "price", "type": "number", "description": "List price"},
+            {"class": "Order", "name": "orderDate", "type": "date", "description": "When it was placed"},
+            {"class": "Order", "name": "value", "type": "number", "description": "Total value"},
+        ],
+    },
+}
+
+
 def respond(task, ctx):
     classes = ctx.get("classes", [])
+    if task == "draft":
+        import copy
+        return copy.deepcopy(DRAFT)
+    if task == "interview" and ctx.get("drafts") and ctx.get("turn", 0) == 0:
+        return {"reply": "I prepared a starting draft from public information. It has things like Product, Distributor and Retailer. Do those look right for you?",
+                "chips": ["Yes, those are right", "Mostly, but we differ", "Not really"], "captured": "", "delta": {}}
     if task == "interview":
         turn = ctx.get("turn", 0)
         if turn == 0:

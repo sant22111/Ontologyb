@@ -104,6 +104,8 @@ ul.tight{margin:4px 0 0;padding-left:18px}
 .edge text{font-size:9px;fill:#6B7794;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
 .dim{opacity:.12}.hot path{stroke:var(--blue2);stroke-width:2.6}.hot text{fill:var(--blue)}
 .node.stub circle{stroke-dasharray:3 2;stroke:#C27A00}
+.node.draft circle{stroke-dasharray:4 3;stroke:#0091DA;stroke-width:2;fill-opacity:.4}
+.edge.draft path{stroke-dasharray:4 3}
 #mnav,#bbtn{display:none}
 #navmap.ping::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#C0392B;margin-left:6px;vertical-align:middle}
 @media(max-width:900px){
@@ -136,6 +138,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
     <div class="mute" style="font-size:12px;margin-top:4px">If given, the AI uses what it generally knows about this kind of business to ask sharper questions. It treats this as guesses to confirm. The name is sent to the AI model, so only use it if the client has agreed.</div>
     <label for="domain">What area are we mapping?</label>
     <input id="domain" placeholder="e.g. Retail banking fraud, GST litigation, Telecom compliance" maxlength="120">
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:500"><input type="checkbox" id="research" checked style="width:auto;margin-top:3px"><span>Prepare a starting draft from public information about this client<span class="mute" style="display:block;font-weight:400;font-size:12px">Takes up to a minute. The AI reads public web pages and pre-fills a base map. Everything starts as a dashed guess, and the client confirms or corrects it. Needs a client name.</span></span></label>
     <label for="about">Anything we should know? <span class="mute" style="font-weight:400">(optional)</span></label>
     <textarea id="about" rows="2" maxlength="1200" placeholder="e.g. sells through 40 distributors, uses SAP and a DMS, trade spend is a worry"></textarea>
     <label for="owner">Your name or team <span class="mute" style="font-weight:400">(optional)</span></label>
@@ -227,8 +230,8 @@ async function initLanding(){
 }
 $('#begin').onclick=async()=>{
   const domain=$('#domain').value.trim(); if(!domain){$('#domain').focus();return}
-  $('#begin').disabled=true;$('#begin').textContent='Starting…';
-  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,template:$('#tpl').value||null});enter(v)}
+  $('#begin').disabled=true;$('#begin').textContent=($('#research').checked&&$('#client').value.trim())?'Researching the client… up to a minute':'Starting…';
+  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,research:$('#research').checked&&!!$('#client').value.trim(),template:$('#tpl').value||null});enter(v)}
   catch(e){err(e)} finally{$('#begin').disabled=false;$('#begin').textContent='Begin'}
 };
 $('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
@@ -324,7 +327,7 @@ const GR={sample:false,pos:{schema:new Map(),sample:new Map()},nodes:[],links:[]
     const mk=(id,label,layer,extra)=>{let n=store.get(id);if(!n){const near=nodes.length?nodes[Math.floor(Math.random()*nodes.length)]:null;n={x:near?near.x+(Math.random()-.5)*80:W/2+(Math.random()-.5)*120,y:near?near.y+(Math.random()-.5)*80:H/2+(Math.random()-.5)*120,vx:0,vy:0};store.set(id,n)}Object.assign(n,{id,label,layer},extra);nodes.push(n);return n};
     if(!this.sample){
       const deg={};S.relationships.forEach(r=>{deg[r.from]=(deg[r.from]||0)+1;deg[r.to]=(deg[r.to]||0)+1});
-      S.classes.forEach(c=>mk(c.name,c.name,c.layer,{stub:c.stub,r:15+Math.min(10,(deg[c.name]||0)*1.6)}));
+      S.classes.forEach(c=>mk(c.name,c.name,c.layer,{stub:c.stub,draft:c.draft,r:15+Math.min(10,(deg[c.name]||0)*1.6)}));
       S.relationships.forEach(r=>links.push({key:`${r.name}|${r.from}|${r.to}`,s:r.from,t:r.to,label:r.name}));
     }else if(S.sample){
       const cls={};S.sample.nodes.forEach(n=>{cls[n.id]=n.class;mk('i:'+n.id,n.label,n.class,{stub:false,r:10,klass:n.class})});
@@ -336,14 +339,14 @@ const GR={sample:false,pos:{schema:new Map(),sample:new Map()},nodes:[],links:[]
     this.draw();
     $('#mapempty').hidden=nodes.length>0;
     const ls=[...new Set(nodes.map(n=>n.layer))];
-    $('#legend').innerHTML=ls.map(l=>`<span><i style="background:${this.color(l)}"></i>${esc(l)}</span>`).join('')+(nodes.some(n=>n.stub)?'<span style="color:#C27A00">◌ dashed = mentioned, not described yet</span>':'');
+    $('#legend').innerHTML=ls.map(l=>`<span><i style="background:${this.color(l)}"></i>${esc(l)}</span>`).join('')+(nodes.some(n=>n.stub)?'<span style="color:#C27A00">◌ dashed = mentioned, not described yet</span>':'')+(nodes.some(n=>n.draft)?'<span style="color:#0091DA">◌ dashed blue = draft from public information, not confirmed yet</span>':'');
     this.alpha=1;this.run();
   },
   draw(){
     const gl=$('#gl'),gn=$('#gn');gl.innerHTML='';gn.innerHTML='';
     this.els={l:[],n:[]};
-    this.links.forEach(l=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','edge');g.innerHTML='<path marker-end="url(#ar)"></path><text text-anchor="middle"></text>';g.querySelector('text').textContent=l.label;gl.appendChild(g);l.el=g});
-    this.nodes.forEach(n=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.stub?' stub':''));g.innerHTML=`<circle r="${n.r}" fill="${this.color(n.layer)}"></circle><text text-anchor="middle" dy="${n.r+13}"></text>`;g.querySelector('text').textContent=n.label;gn.appendChild(g);n.el=g;
+    this.links.forEach(l=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','edge'+((l.a.draft||l.b.draft)?' draft':''));g.innerHTML='<path marker-end="url(#ar)"></path><text text-anchor="middle"></text>';g.querySelector('text').textContent=l.label;gl.appendChild(g);l.el=g});
+    this.nodes.forEach(n=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.stub?' stub':'')+(n.draft?' draft':''));g.innerHTML=`<circle r="${n.r}" fill="${this.color(n.layer)}"></circle><text text-anchor="middle" dy="${n.r+13}"></text>`;g.querySelector('text').textContent=n.label;gn.appendChild(g);n.el=g;
       g.addEventListener('pointerdown',e=>this.dragStart(e,n));g.addEventListener('click',e=>{if(!n._drag)openNode(n)})});
     this.applyHl();
   },
@@ -417,6 +420,7 @@ async function openNode(n){
     const rel=r=>{const o=r.from===c.name;const other=o?r.to:r.from;return `<li>${o?'':'<span class="mute">← </span>'}<b>${esc(r.name.replace(/_/g,' ').toLowerCase())}</b> ${o?'→':'from'} <span class="link" data-n="${esc(other)}">${esc(other)}</span><div class="mute" style="font-size:12px">${esc(r.description||'')}</div></li>`};
     d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true;GR.hl=null;GR.applyHl()">×</button>
     <h3>${esc(c.name)}</h3><div class="mute">${esc(c.layer||'')}${c.parent?' · kind of '+esc(c.parent):''}${c.stub?' · <span style="color:#C27A00">not described yet</span>':''}</div>
+    ${c.draft?`<div class="sect" style="background:#EAF6FD;border:1px solid #0091DA;border-radius:8px;padding:8px 10px;margin:8px 0"><b>Draft from public information.</b> Is this right for you?<div style="margin-top:6px;display:flex;gap:6px"><button class="btn sm" id="cfy">Yes, keep it</button><button class="btn ghost sm" id="cfn">No, remove it</button></div></div>`:''}
     <p>${esc(c.description)}</p>
     ${c.why?`<h4>Why it is here</h4><div>${esc(c.why)}</div>`:''}
     ${c.example?`<h4>Example</h4><div>${esc(c.example)}</div>`:''}
@@ -427,6 +431,8 @@ async function openNode(n){
     <h4>Questions it helps answer</h4>${x.questions.length?`<ul class="tight">${x.questions.map(q=>`<li>${esc(q.question)} <span class="st ${q.status}">${q.status==='yes'?'answerable':q.status==='partial'?'partly':'not yet'}</span></li>`).join('')}</ul>`:'<div class="mute">Try some in the “Test it” tab</div>'}
     <h4>Something wrong?</h4><textarea id="chtxt" rows="2" placeholder="e.g. This is actually two different things / rename it / wrong connection"></textarea><button class="btn sm" style="margin-top:6px" id="chgo">Fix it</button>`;
     d.querySelectorAll('.link').forEach(a=>a.onclick=()=>{const t=GR.nodes.find(z=>z.id===a.dataset.n);if(t)openNode(t)});
+    const cf=async a=>{try{const v=await api(`/session/${sid}/confirm`,'POST',{name:c.name,action:a});render(v);$('#drawer').hidden=true;GR.hl=null;GR.applyHl();toast(a==='confirm'?'Confirmed':'Removed')}catch(e){err(e)}};
+    if($('#cfy')){$('#cfy').onclick=()=>cf('confirm');$('#cfn').onclick=()=>cf('remove')}
     $('#chgo').onclick=()=>challenge(`About "${c.name}": `+$('#chtxt').value,$('#chgo'));
   }catch(e){d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button><div>${esc(e.message)}</div>`}
 }

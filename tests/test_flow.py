@@ -125,3 +125,34 @@ if __name__ == "__main__":
     test_messy_model_output()
     test_password_gate()
     print("ALL PASSED")
+
+
+def test_draft_flow():
+    import tempfile, importlib, os
+    os.environ["STUDIO_DATA_DIR"] = tempfile.mkdtemp()
+    os.environ["LLM_PROVIDER"] = "mock"
+    from fastapi.testclient import TestClient
+    import app as A
+    importlib.reload(A)
+    c = TestClient(A.app)
+    v = c.post("/api/session", json={"domain": "Sales", "client": "Acme Foods", "research": True}).json()
+    drafts = [x for x in v["classes"] if x.get("draft")]
+    assert len(drafts) >= 6 and v["score"] == 0, (len(drafts), v["score"])
+    assert v["draft"]["basis"] == "general"
+    assert "starting draft" in v["messages"][-1]["content"]
+    sid = v["id"]
+    v = c.post(f"/api/session/{sid}/confirm", json={"name": "Product", "action": "confirm"}).json()
+    assert not next(x for x in v["classes"] if x["name"] == "Product")["draft"]
+    n = len(v["classes"])
+    v = c.post(f"/api/session/{sid}/confirm", json={"name": "Retailer", "action": "remove"}).json()
+    assert len(v["classes"]) == n - 1
+    v = c.post(f"/api/session/{sid}/confirm", json={"action": "confirm_all"}).json()
+    assert not any(x.get("draft") for x in v["classes"]) and v["score"] > 0
+    assert c.get(f"/api/session/{sid}/export.xlsx").status_code == 200
+    v2 = c.post("/api/session", json={"domain": "Sales", "client": "Acme"}).json()
+    assert not any(x.get("draft") for x in v2["classes"])
+    print("draft flow ok")
+
+
+if __name__ == "__main__":
+    test_draft_flow()

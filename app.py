@@ -119,15 +119,34 @@ def llm_history(st, limit=16):
     return msgs
 
 
+def build_draft(st):
+    """Research the client and pre-fill the map with unconfirmed guesses. Never blocks the workshop."""
+    tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else ""
+    user = f"Client: {st['client']}\nArea: {st['domain']}\nTeam notes: {st['about'] or '(none)'}"
+    try:
+        obj, urls = llm.research(P.draft_system(st["client"], st["about"], st["domain"], tnote), user, {})
+        delta = obj.get("delta") if isinstance(obj, dict) and isinstance(obj.get("delta"), dict) else {}
+        for k in ("rules", "remove", "rename", "confirm"):
+            delta.pop(k, None)
+        ont.apply_delta(st, delta, "draft")
+        ont.mark_draft(st)
+        st["draft"] = {"basis": "web" if urls else "general", "sources": urls,
+                       "summary": str(obj.get("summary", ""))[:400] if isinstance(obj, dict) else ""}
+        ont.log(st, "draft", "Starting draft prepared (" + (f"{len(urls)} public web pages: " + "; ".join(urls) if urls else "general knowledge only, no web pages read") + ")")
+    except Exception as e:  # the workshop still works without the draft
+        st["draft"] = {"basis": "none", "sources": [], "error": str(e)[:200]}
+
+
 def interview_turn(st, user_text):
     turn = sum(1 for m in st["messages"] if m["role"] == "user")
     if user_text is not None:
         st["messages"].append({"role": "user", "content": user_text})
         turn += 1
     s = ont.summary(st)
+    drafts = [k for k, c in st["classes"].items() if c.get("draft")]
     tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else "No template; start from the client's own words."
-    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""))
-    ctx = {"turn": turn, "classes": list(st["classes"].keys())}
+    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""), drafts)
+    ctx = {"turn": turn, "classes": list(st["classes"].keys()), "drafts": bool(drafts)}
     try:
         res = ai("interview", system, llm_history(st), ctx)
     except HTTPException:
@@ -146,6 +165,7 @@ class NewSession(BaseModel):
     owner: str = ""
     client: str = ""
     about: str = ""
+    research: bool = False
 
 
 class Msg(BaseModel):
@@ -196,7 +216,26 @@ def create(body: NewSession):
         raise HTTPException(400, "Tell us what area to map")
     st = ont.new_state(body.domain, body.template, body.owner, body.client, body.about)
     with _lock(st["id"]):
+        if body.research and st["client"]:
+            build_draft(st)
         interview_turn(st, None)
+        save(st)
+    return present(st)
+
+
+class Confirm(BaseModel):
+    name: str = ""
+    action: str  # confirm | confirm_all | remove
+
+
+@app.post("/api/session/{sid}/confirm")
+def confirm(sid: str, body: Confirm):
+    if body.action not in ("confirm", "confirm_all", "remove"):
+        raise HTTPException(400, "unknown action")
+    st = load(sid)
+    with _lock(sid):
+        if not ont.confirm_or_remove(st, body.name, body.action):
+            raise HTTPException(404, "No such thing on the map")
         save(st)
     return present(st)
 
@@ -353,7 +392,17 @@ def challenge(sid: str, body: Challenge):
 
 @app.get("/api/session/{sid}/export.xlsx")
 def export_xlsx(sid: str):
-    st = load(sid)
+    st = json.loads(json.dumps(load(sid)))
+    dr = {k for k, c in st["classes"].items() if c.get("draft")}
+    tag = "[Unconfirmed draft from public information] "
+    for k in dr:
+        st["classes"][k]["description"] = tag + (st["classes"][k].get("description") or "")
+    for r in st["relationships"]:
+        if r["from"] in dr or r["to"] in dr:
+            r["description"] = tag + (r.get("description") or "")
+    for p in st["properties"]:
+        if p["class"] in dr:
+            p["description"] = tag + (p.get("description") or "")
     data = excel.build_workbook(st)
     name = "".join(ch if ch.isalnum() else "_" for ch in st["domain"])[:40] or "ontology"
     return Response(data, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
