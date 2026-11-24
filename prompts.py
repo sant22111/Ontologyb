@@ -87,6 +87,8 @@ CURRENT MAP (do not repeat what is already there):
 
 Rules for extraction:
 - Use ONLY what the document says. Never add outside knowledge.
+- You are mapping KINDS of things, not individual records. If the document names specific cases (a particular contract, person, field, invoice), do not make each one its own thing. Make the kind ("Contract", "Field") and put one named case in "example". Ignore long lists of records and figures.
+- Table headings, form fields and column names are good sources for details (properties) of a thing.
 - For every class, relationship and rule, set source_quote to an exact, verbatim sentence or phrase from the document (max 25 words, copied character for character). Anything without a real quote will be discarded.
 - Include rules the document states: who decides (authority), deadlines and expiries (time), exceptions, compliance limits. Rules must have applies_to naming classes.
 - 3 to 10 classes, their relationships, 2 to 3 details for the important ones, and as many rules as the document clearly states.

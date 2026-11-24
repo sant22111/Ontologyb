@@ -200,7 +200,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
           <div class="tool">
             <button class="btn ghost sm" id="fit">Fit</button>
             <button class="btn sm" id="grow">＋ Grow</button>
-            <button class="btn ghost sm" id="ex">Show example data</button>
+            <button class="btn ghost sm" id="ex">See a made-up example</button>
             <button class="btn ghost sm" id="clr" hidden>Clear highlight</button>
           </div>
           <div class="legend" id="legend"></div>
@@ -344,7 +344,7 @@ function openGrow(){
   ${n?`<div class="sect" style="background:#EAF6FD;border:1px solid #0091DA;border-radius:8px;padding:8px 10px;margin:10px 0"><b>${n} item(s) waiting for your review.</b><div style="margin-top:6px"><button class="btn sm" id="gorev">Review them</button></div></div>`:''}
   <h4>Suggest more</h4><div class="mute" style="font-size:13px">The AI looks for what is missing. Name a topic to focus it.</div>
   <div class="growrow"><input type="text" id="smtopic" placeholder="e.g. gas pricing, vendors (optional)" maxlength="200"><button class="btn sm" id="smgo">Suggest</button></div>
-  <h4>Add from a document</h4><div class="mute" style="font-size:13px">Upload a policy, process note or annual report (PDF, Word or text, up to 10 MB). The AI adds what the document says, each with a quote from it. The file is sent to the AI model and is not stored. Only upload what the client has agreed to share.</div>
+  <h4>Add from a document</h4><div class="mute" style="font-size:13px">Upload something that describes <b>how the business works</b>: a policy, process note, contract template, data dictionary, form, org chart or a summary report. Please do not upload raw data or long lists of records. The AI picks out the kinds of things, connections and rules it describes, each with a quote from the document. The file is sent to the AI model and is not stored. Only upload what the client has agreed to share.</div>
   <div class="growrow"><input type="file" id="docfile" accept=".pdf,.docx,.txt,.md" style="flex:1;min-width:0"><button class="btn sm" id="docgo">Read it</button></div>
   <div class="mute" style="font-size:12px">The first ~30,000 characters (about 15 pages) are read. For long files, upload the sections that matter.</div>`;
   if(n)$('#gorev').onclick=openReview;
@@ -399,7 +399,7 @@ document.addEventListener('click',()=>{$('#dlpop').hidden=true});
 /* ---------------- graph ---------------- */
 const PAL=['#00338D','#0091DA','#483698','#00A3A1','#C27A00','#B5367A','#1B8A5A','#6D7B9C','#D2503C','#7AA116'];
 const GR={sample:false,pos:{schema:new Map(),sample:new Map()},nodes:[],links:[],view:{x:0,y:0,k:1},hl:null,alpha:0,raf:0,moved:false,layers:new Map(),els:{},
-  reset(){this.pos={schema:new Map(),sample:new Map()};this.sample=false;this.hl=null;this.moved=false;this.view={x:0,y:0,k:1};$('#drawer').hidden=true;$('#ex').textContent='Show example data';$('#clr').hidden=true},
+  reset(){this.pos={schema:new Map(),sample:new Map()};this.sample=false;this.hl=null;this.moved=false;this.view={x:0,y:0,k:1};$('#drawer').hidden=true;$('#ex').textContent='See a made-up example';$('#clr').hidden=true},
   color(l){if(!this.layers.has(l))this.layers.set(l,PAL[this.layers.size%PAL.length]);return this.layers.get(l)},
   sync(){
     if(!S||$('#p-map').hidden)return;
@@ -478,12 +478,12 @@ $('#clr').onclick=()=>{GR.hl=null;GR.applyHl()};
 $('#ex').onclick=async()=>{
   if(!GR.sample){
     if(!S.sample||S.sample_stale){$('#ex').disabled=true;$('#ex').textContent='Creating example…';
-      try{render(await api(`/session/${sid}/sample`,'POST'))}catch(e){err(e);$('#ex').disabled=false;$('#ex').textContent='Show example data';return}$('#ex').disabled=false}
-    GR.sample=true;$('#ex').textContent='Back to the map';
-  }else{GR.sample=false;$('#ex').textContent='Show example data'}
+      try{render(await api(`/session/${sid}/sample`,'POST'))}catch(e){err(e);$('#ex').disabled=false;$('#ex').textContent='See a made-up example';return}$('#ex').disabled=false}
+    GR.sample=true;$('#ex').textContent='Back to my map';
+  }else{GR.sample=false;$('#ex').textContent='See a made-up example'}
   GR.hl=null;GR.moved=false;$('#drawer').hidden=true;GR.sync();
 };
-function highlight(nodes,edges){GR.hl={nodes:new Set(nodes),edges:new Set(edges)};if(GR.sample){GR.sample=false;$('#ex').textContent='Show example data';GR.sync()}setTab('map');GR.applyHl()}
+function highlight(nodes,edges){GR.hl={nodes:new Set(nodes),edges:new Set(edges)};if(GR.sample){GR.sample=false;$('#ex').textContent='See a made-up example';GR.sync()}setTab('map');GR.applyHl()}
 
 /* ---------------- node explorer ---------------- */
 async function openNode(n){
