@@ -1,0 +1,13 @@
+# One-click deploy on Render: New > Blueprint > pick this repo.
+# Keys are asked for at deploy time and never stored in the repo.
+services:
+  - type: web
+    name: business-map-studio
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: STUDIO_PASSWORD
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

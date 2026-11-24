@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Map Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2300338D'/%3E%3Ccircle cx='10' cy='11' r='4' fill='white'/%3E%3Ccircle cx='23' cy='10' r='3' fill='%230091DA'/%3E%3Ccircle cx='17' cy='23' r='4' fill='white'/%3E%3Cpath d='M10 11L23 10M10 11L17 23M23 10L17 23' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E">
+<style>
+:root{--blue:#00338D;--blue2:#0091DA;--ink:#1A1A2E;--mute:#6B7794;--line:#E1E6EF;--bg:#F5F7FB;--ok:#1B8A5A;--warn:#C27A00;--bad:#C0392B;--r:10px}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-weight:600}
+.btn:hover{background:#00266b}.btn:disabled{opacity:.5;cursor:default}
+.btn.ghost{background:#fff;color:var(--blue);border:1px solid var(--line)}
+.btn.ghost:hover{border-color:var(--blue)}
+.btn.sm{padding:5px 10px;font-size:12px}
+input,textarea,select{font:inherit;border:1px solid var(--line);border-radius:8px;padding:9px 11px;width:100%;background:#fff;color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:2px solid #bcd2f5;border-color:var(--blue)}
+[hidden]{display:none!important}
+.mute{color:var(--mute)}
+/* landing */
+#landing{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:28px;max-width:560px;width:100%;box-shadow:0 6px 30px rgba(0,51,141,.06)}
+.card h1{margin:0 0 4px;font-size:26px;color:var(--blue)}
+.card label{display:block;font-weight:600;margin:16px 0 6px}
+.sess{display:flex;justify-content:space-between;align-items:center;padding:9px 11px;border:1px solid var(--line);border-radius:8px;margin-top:6px;cursor:pointer;background:#fff}
+.sess:hover{border-color:var(--blue)}
+.pill{display:inline-block;border-radius:99px;padding:2px 9px;font-size:11px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--mute)}
+.pill.demo{background:#FFF4DB;border-color:#F0D58A;color:#8a5b00}
+/* app shell */
+#app{height:100%;display:flex;flex-direction:column}
+header{background:#fff;border-bottom:1px solid var(--line);padding:8px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.brand{font-weight:700;color:var(--blue);letter-spacing:.2px}
+.dom{font-weight:600}
+.ring{position:relative;width:54px;height:54px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--blue)}
+.badges{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:200px}
+.badge{font-size:11px;padding:3px 9px;border-radius:99px;border:1px dashed #cfd6e4;color:#9aa5bd;background:#fafbfd}
+.badge.on{border:1px solid #9fc2f0;background:#EAF2FF;color:var(--blue);font-weight:600}
+.hdr-actions{display:flex;gap:8px;align-items:center}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(0,145,218,.5)}50%{box-shadow:0 0 0 7px rgba(0,145,218,0)}}
+.btn.glow{animation:glow 1.8s infinite;border-color:var(--blue2)}
+.menu{position:relative}
+.menu .pop{position:absolute;right:0;top:110%;background:#fff;border:1px solid var(--line);border-radius:8px;min-width:210px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:30}
+.menu .pop a{display:block;padding:9px 12px;color:var(--ink);text-decoration:none}
+.menu .pop a:hover{background:var(--bg)}
+main{flex:1;display:grid;grid-template-columns:minmax(340px,38%) 1fr;gap:12px;padding:12px;min-height:0}
+.panel{background:#fff;border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.steps{display:flex;gap:4px;padding:10px;border-bottom:1px solid var(--line);overflow-x:auto}
+.step{flex:1;min-width:84px;text-align:center;font-size:11px;padding:6px 4px;border-radius:8px;background:var(--bg);color:var(--mute);border:1px solid transparent}
+.step.done{color:var(--ok)}
+.step.now{background:#EAF2FF;color:var(--blue);font-weight:700;border-color:#9fc2f0}
+#chat{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:92%;padding:10px 12px;border-radius:12px;white-space:pre-wrap}
+.msg.a{background:var(--bg);border:1px solid var(--line);align-self:flex-start}
+.msg.u{background:var(--blue);color:#fff;align-self:flex-end}
+.cap{display:block;margin-top:6px;font-size:11px;color:var(--ok);font-weight:600}
+#chips{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 8px}
+.chip{border:1px solid #9fc2f0;background:#fff;color:var(--blue);border-radius:99px;padding:5px 11px;font-size:12px}
+.chip:hover{background:#EAF2FF}
+.composer{border-top:1px solid var(--line);padding:10px;display:flex;gap:8px;align-items:flex-end}
+.composer textarea{resize:none;height:56px}
+.dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#9aa5bd;margin:0 2px;animation:b 1s infinite}
+.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
+@keyframes b{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
+.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 8px;gap:2px;align-items:center}
+.tab{padding:11px 14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);font-weight:600}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tabs .sp{flex:1}
+.pane{flex:1;min-height:0;overflow:auto;position:relative}
+#mapwrap{position:absolute;inset:0}
+#svg{width:100%;height:100%;display:block;background:radial-gradient(circle at 1px 1px,#e3e8f2 1px,transparent 0) 0 0/22px 22px;cursor:grab;touch-action:none}
+.tool{position:absolute;left:10px;top:10px;display:flex;gap:6px;flex-wrap:wrap;z-index:5}
+.legend{position:absolute;left:10px;bottom:10px;display:flex;gap:10px;flex-wrap:wrap;background:#ffffffd9;border:1px solid var(--line);border-radius:8px;padding:6px 9px;font-size:11px;max-width:70%}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--mute);text-align:center;padding:30px;pointer-events:none}
+.drawer{position:absolute;right:0;top:0;bottom:0;width:min(380px,92%);background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 24px rgba(0,0,0,.06);overflow:auto;padding:16px;z-index:8}
+.drawer h3{margin:0 0 2px;color:var(--blue)}
+.drawer h4{margin:14px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--mute)}
+.quote{border-left:3px solid #9fc2f0;padding:4px 10px;background:#f6f9ff;font-style:italic}
+.link{color:var(--blue);cursor:pointer;text-decoration:underline}
+.x{float:right;background:none;border:0;font-size:20px;color:var(--mute)}
+.pad{padding:16px}
+.q{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
+.st{font-size:11px;font-weight:700;border-radius:99px;padding:2px 9px;margin-right:6px}
+.st.yes{background:#E3F5EC;color:var(--ok)}.st.partial{background:#FFF1D6;color:var(--warn)}.st.no{background:#FBE5E2;color:var(--bad)}
+.gap{display:flex;justify-content:space-between;gap:8px;align-items:center;background:#FFF8EC;border:1px solid #F3DEB0;border-radius:8px;padding:6px 9px;margin-top:6px;font-size:13px}
+.step-line{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:#f3f6fb;padding:3px 8px;border-radius:6px;margin:3px 0;display:inline-block}
+.sect{margin-bottom:14px}.sect h4{margin:0 0 4px;color:var(--blue)}
+ul.tight{margin:4px 0 0;padding-left:18px}
+.hist{font-size:12px;padding:6px 0;border-bottom:1px solid var(--line)}
+#toast{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:100}
+.t{background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:320px;animation:in .25s}
+.t.gold{background:linear-gradient(90deg,#00338D,#0091DA)}
+@keyframes in{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+#modal{position:fixed;inset:0;background:rgba(10,20,50,.55);display:flex;align-items:center;justify-content:center;z-index:90;padding:20px}
+#modal .card{max-height:90vh;overflow:auto}
+.node circle{stroke:#fff;stroke-width:2;cursor:pointer}
+.node text{font-size:11px;font-weight:600;fill:#1A1A2E;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
+.edge path{fill:none;stroke:#9aa7c2;stroke-width:1.4}
+.edge text{font-size:9px;fill:#6B7794;paint-order:stroke;stroke:#fff;stroke-width:3px;pointer-events:none}
+.dim{opacity:.12}.hot path{stroke:var(--blue2);stroke-width:2.6}.hot text{fill:var(--blue)}
+.node.stub circle{stroke-dasharray:3 2;stroke:#C27A00}
+@media(max-width:900px){main{grid-template-columns:1fr;grid-auto-rows:minmax(480px,auto)}}
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <div class="card">
+    <h1>Map your business</h1>
+    <div class="mute">Answer a few friendly questions. Watch a live map of how your world fits together grow in front of you. Test it with real questions, then download it.</div>
+    <label for="domain">What area are we mapping?</label>
+    <input id="domain" placeholder="e.g. Retail banking fraud, GST litigation, Telecom compliance" maxlength="120">
+    <label for="owner">Your name or team <span class="mute" style="font-weight:400">(optional)</span></label>
+    <input id="owner" maxlength="80">
+    <label for="tpl">Start from something similar?</label>
+    <select id="tpl"><option value="">Start from scratch</option></select>
+    <div style="margin-top:20px;display:flex;gap:10px;align-items:center">
+      <button class="btn" id="begin">Begin</button><span id="mode" class="pill"></span>
+    </div>
+    <div class="mute" style="margin-top:14px;font-size:12px">Shared demo: use your own examples. Please do not enter confidential client data.</div>
+    <div id="past" style="margin-top:22px" hidden><div class="mute" style="font-weight:600">Pick up where you left off</div><div id="pastlist"></div></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div><div class="brand">Business Map Studio</div><div class="dom" id="hdom"></div></div>
+    <div class="ring" title="Map strength"><svg width="54" height="54"><circle cx="27" cy="27" r="23" fill="none" stroke="#E1E6EF" stroke-width="6"/><circle id="arc" cx="27" cy="27" r="23" fill="none" stroke="#00338D" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 145"/></svg><b id="score">0</b></div>
+    <div class="badges" id="badges"></div>
+    <div class="hdr-actions">
+      <button class="btn ghost sm" id="reveal" hidden>✨ What did we just build?</button>
+      <div class="menu"><button class="btn sm" id="dl">Download ▾</button>
+        <div class="pop" id="dlpop" hidden></div></div>
+      <button class="btn ghost sm" id="home">Sessions</button>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <div class="steps" id="steps"></div>
+      <div id="chat"></div>
+      <div id="chips"></div>
+      <div class="composer"><textarea id="inp" placeholder="Type your answer… (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn" id="send">Send</button></div>
+    </section>
+    <section class="panel">
+      <div class="tabs">
+        <button class="tab on" data-t="map">Your map</button>
+        <button class="tab" data-t="arena">Test it</button>
+        <button class="tab" data-t="story">Explain it</button>
+        <button class="tab" data-t="hist">Changes</button>
+        <span class="sp"></span><span class="mute" id="counts" style="font-size:12px;padding-right:8px"></span>
+      </div>
+      <div class="pane" id="p-map">
+        <div id="mapwrap">
+          <svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9aa7c2"/></marker></defs><g id="vp"><g id="gl"></g><g id="gn"></g></g></svg>
+          <div class="tool">
+            <button class="btn ghost sm" id="fit">Fit</button>
+            <button class="btn ghost sm" id="ex">Show example data</button>
+            <button class="btn ghost sm" id="clr" hidden>Clear highlight</button>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="empty" id="mapempty">Your map will appear here as you answer.<br>Each answer adds things and connections.</div>
+          <div class="drawer" id="drawer" hidden></div>
+        </div>
+      </div>
+      <div class="pane pad" id="p-arena" hidden></div>
+      <div class="pane pad" id="p-story" hidden></div>
+      <div class="pane pad" id="p-hist" hidden></div>
+    </section>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="modal" hidden></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S=null, sid=null, busy=false, tab='map';
+
+async function api(path,method='GET',body){
+  const r=await fetch('/api'+path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  if(!r.ok){let m=r.statusText;try{const j=await r.json();m=j.detail||m}catch(e){}throw new Error(m)}
+  return r.json();
+}
+function toast(msg,gold){const d=document.createElement('div');d.className='t'+(gold?' gold':'');d.textContent=msg;$('#toast').appendChild(d);setTimeout(()=>d.remove(),gold?5200:3800)}
+function err(e){toast('⚠ '+e.message)}
+
+/* ---------------- landing ---------------- */
+async function initLanding(){
+  const cfg=await api('/config');
+  cfg.templates.forEach(t=>{const o=document.createElement('option');o.value=t.id;o.textContent=t.label;$('#tpl').appendChild(o)});
+  const m=$('#mode');
+  if(cfg.provider==='mock'){m.textContent='Demo mode: no AI key set, scripted answers';m.classList.add('demo')}
+  else m.textContent='AI: '+cfg.provider+' · '+cfg.model;
+  const list=await api('/sessions');
+  if(list.length){$('#past').hidden=false;$('#pastlist').innerHTML=list.map(s=>`<div class="sess" data-id="${esc(s.id)}"><span><b>${esc(s.domain)}</b> <span class="mute">${esc(s.owner)}</span></span><span class="pill">${s.things} things · ${s.score}/100</span></div>`).join('');
+    document.querySelectorAll('.sess').forEach(e=>e.onclick=()=>openSession(e.dataset.id));}
+}
+$('#begin').onclick=async()=>{
+  const domain=$('#domain').value.trim(); if(!domain){$('#domain').focus();return}
+  $('#begin').disabled=true;$('#begin').textContent='Starting…';
+  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,template:$('#tpl').value||null});enter(v)}
+  catch(e){err(e)} finally{$('#begin').disabled=false;$('#begin').textContent='Begin'}
+};
+$('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
+async function openSession(id){try{enter(await api('/session/'+id))}catch(e){err(e)}}
+$('#home').onclick=()=>{$('#app').hidden=true;$('#landing').hidden=false;sid=null;initLanding()};
+
+function enter(v){
+  sid=v.id;$('#landing').hidden=true;$('#app').hidden=false;S=null;GR.reset();render(v,true);
+  $('#dlpop').innerHTML=`<a href="/api/session/${sid}/export.xlsx">Excel workbook (.xlsx)</a><a href="/api/session/${sid}/export.json">Schema (.json)</a>`;
+  setTab('map');
+}
+
+/* ---------------- render ---------------- */
+function render(v,first){
+  const prev=S;S=v;
+  $('#hdom').textContent=v.domain;
+  $('#score').textContent=v.score;
+  const C=2*Math.PI*23;$('#arc').setAttribute('stroke-dasharray',`${C*v.score/100} ${C}`);
+  $('#badges').innerHTML=v.badges.map(b=>`<span class="badge ${b.earned?'on':''}" title="${esc(b.hint)}">${b.earned?'★ ':''}${esc(b.name)}</span>`).join('');
+  $('#counts').textContent=`${v.counts.things} things · ${v.counts.connections} connections · ${v.counts.rules} rules`;
+  $('#steps').innerHTML=[1,2,3,4,5].map(n=>{const names={1:'Your world',2:'Connect the dots',3:'Rules of the game',4:'Test it',5:'Complete'};return `<div class="step ${n<v.stage?'done':n===v.stage?'now':''}">${n<v.stage?'✓ ':''}${n}. ${names[n]}</div>`}).join('');
+  $('#reveal').hidden=v.score<60;
+  renderChat(v);
+  GR.sync();
+  if(tab==='arena')renderArena();
+  if(tab==='story')renderStory();
+  if(tab==='hist')renderHist();
+  if(first){GR.fit()}
+  $('#reveal').classList.toggle('glow',v.score>=70);
+  if(v.score>=70){try{const k='rv_'+v.id;if(!localStorage.getItem(k)){localStorage.setItem(k,'1');setTimeout(()=>toast('✨ You unlocked the big reveal. Click “What did we just build?”',true),700)}}catch(e){}}
+}
+function renderChat(v){
+  const c=$('#chat');
+  c.innerHTML=v.messages.map(m=>{
+    if(m.role==='user')return `<div class="msg u">${esc(m.content)}</div>`;
+    const a=m.added||{};const bits=[];
+    if(a.classes)bits.push(`+${a.classes} thing${a.classes>1?'s':''}`);if(a.relationships)bits.push(`+${a.relationships} connection${a.relationships>1?'s':''}`);
+    if(a.rules)bits.push(`+${a.rules} rule${a.rules>1?'s':''}`);if(a.properties)bits.push(`+${a.properties} detail${a.properties>1?'s':''}`);
+    return `<div class="msg a">${esc(m.content)}${bits.length?`<span class="cap">✓ Captured: ${esc(m.captured||bits.join(', '))} (${bits.join(' · ')})</span>`:''}</div>`}).join('');
+  if(busy)c.innerHTML+=`<div class="msg a"><span class="dots"><span></span><span></span><span></span></span></div>`;
+  c.scrollTop=c.scrollHeight;
+  const last=v.messages[v.messages.length-1];
+  const chips=(last&&last.role==='assistant'&&!busy)?(last.chips||[]):[];
+  $('#chips').innerHTML=chips.map(x=>`<button class="chip">${esc(x)}</button>`).join('')+(chips.length?`<button class="chip" style="border-style:dashed;color:#6B7794;border-color:#cfd6e4">I'm not sure</button>`:'');
+  document.querySelectorAll('#chips .chip').forEach(b=>b.onclick=()=>send(b.textContent));
+}
+async function send(text){
+  text=(text||'').trim();if(!text||busy)return;
+  busy=true;$('#inp').value='';$('#send').disabled=true;
+  S.messages.push({role:'user',content:text});renderChat(S);
+  try{
+    const v=await api(`/session/${sid}/chat`,'POST',{message:text});
+    busy=false;const t=v.turn||{};render(v);
+    const a=t.added||{};const n=(a.classes||0)+(a.relationships||0)+(a.rules||0)+(a.properties||0);
+    if(n)toast(`Map grew: +${a.classes||0} things, +${a.relationships||0} connections, +${a.rules||0} rules`);
+    if((t.new_badges||[]).length)toast('🏅 Badge unlocked: '+t.new_badges.join(', '),true);
+    if(t.level_up)toast('⬆ Level up: '+v.stage_name,true);
+  }catch(e){busy=false;S.messages.pop();renderChat(S);$('#inp').value=text;err(e)}
+  $('#send').disabled=false;$('#inp').focus();
+}
+$('#send').onclick=()=>send($('#inp').value);
+$('#inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send($('#inp').value)}});
+
+/* ---------------- tabs ---------------- */
+function setTab(t){
+  tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['map','arena','story','hist'].forEach(x=>$('#p-'+x).hidden=x!==t);
+  if(t==='arena')renderArena();if(t==='story')renderStory();if(t==='hist')renderHist();if(t==='map')GR.sync();
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
+$('#dl').onclick=e=>{e.stopPropagation();$('#dlpop').hidden=!$('#dlpop').hidden};
+document.addEventListener('click',()=>{$('#dlpop').hidden=true});
+
+/* ---------------- graph ---------------- */
+const PAL=['#00338D','#0091DA','#483698','#00A3A1','#C27A00','#B5367A','#1B8A5A','#6D7B9C','#D2503C','#7AA116'];
+const GR={sample:false,pos:{schema:new Map(),sample:new Map()},nodes:[],links:[],view:{x:0,y:0,k:1},hl:null,alpha:0,raf:0,moved:false,layers:new Map(),els:{},
+  reset(){this.pos={schema:new Map(),sample:new Map()};this.sample=false;this.hl=null;this.moved=false;this.view={x:0,y:0,k:1};$('#drawer').hidden=true;$('#ex').textContent='Show example data';$('#clr').hidden=true},
+  color(l){if(!this.layers.has(l))this.layers.set(l,PAL[this.layers.size%PAL.length]);return this.layers.get(l)},
+  sync(){
+    if(!S||$('#p-map').hidden)return;
+    const store=this.pos[this.sample?'sample':'schema'];let nodes=[],links=[];
+    const W=$('#svg').clientWidth||600,H=$('#svg').clientHeight||400;
+    const mk=(id,label,layer,extra)=>{let n=store.get(id);if(!n){const near=nodes.length?nodes[Math.floor(Math.random()*nodes.length)]:null;n={x:near?near.x+(Math.random()-.5)*80:W/2+(Math.random()-.5)*120,y:near?near.y+(Math.random()-.5)*80:H/2+(Math.random()-.5)*120,vx:0,vy:0};store.set(id,n)}Object.assign(n,{id,label,layer},extra);nodes.push(n);return n};
+    if(!this.sample){
+      const deg={};S.relationships.forEach(r=>{deg[r.from]=(deg[r.from]||0)+1;deg[r.to]=(deg[r.to]||0)+1});
+      S.classes.forEach(c=>mk(c.name,c.name,c.layer,{stub:c.stub,r:15+Math.min(10,(deg[c.name]||0)*1.6)}));
+      S.relationships.forEach(r=>links.push({key:`${r.name}|${r.from}|${r.to}`,s:r.from,t:r.to,label:r.name}));
+    }else if(S.sample){
+      const cls={};S.sample.nodes.forEach(n=>{cls[n.id]=n.class;mk('i:'+n.id,n.label,n.class,{stub:false,r:10,klass:n.class})});
+      S.sample.edges.forEach(e=>links.push({key:`i:${e.from}|${e.rel}|i:${e.to}`,s:'i:'+e.from,t:'i:'+e.to,label:e.rel}));
+    }
+    this.nodes=nodes;const byId=new Map(nodes.map(n=>[n.id,n]));
+    this.links=links.filter(l=>byId.has(l.s)&&byId.has(l.t)).map(l=>({...l,a:byId.get(l.s),b:byId.get(l.t)}));
+    const seen={};this.links.forEach(l=>{const k=[l.s,l.t].sort().join('~');seen[k]=(seen[k]||0);l.idx=seen[k]++;l.self=l.s===l.t});
+    this.draw();
+    $('#mapempty').hidden=nodes.length>0;
+    const ls=[...new Set(nodes.map(n=>n.layer))];
+    $('#legend').innerHTML=ls.map(l=>`<span><i style="background:${this.color(l)}"></i>${esc(l)}</span>`).join('')+(nodes.some(n=>n.stub)?'<span style="color:#C27A00">◌ dashed = mentioned, not described yet</span>':'');
+    this.alpha=1;this.run();
+  },
+  draw(){
+    const gl=$('#gl'),gn=$('#gn');gl.innerHTML='';gn.innerHTML='';
+    this.els={l:[],n:[]};
+    this.links.forEach(l=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','edge');g.innerHTML='<path marker-end="url(#ar)"></path><text text-anchor="middle"></text>';g.querySelector('text').textContent=l.label;gl.appendChild(g);l.el=g});
+    this.nodes.forEach(n=>{const g=document.createElementNS('http://www.w3.org/2000/svg','g');g.setAttribute('class','node'+(n.stub?' stub':''));g.innerHTML=`<circle r="${n.r}" fill="${this.color(n.layer)}"></circle><text text-anchor="middle" dy="${n.r+13}"></text>`;g.querySelector('text').textContent=n.label;gn.appendChild(g);n.el=g;
+      g.addEventListener('pointerdown',e=>this.dragStart(e,n));g.addEventListener('click',e=>{if(!n._drag)openNode(n)})});
+    this.applyHl();
+  },
+  applyHl(){
+    const h=this.hl;$('#clr').hidden=!h;
+    this.nodes.forEach(n=>n.el&&n.el.classList.toggle('dim',!!h&&!(h.nodes.has(n.id))));
+    this.links.forEach(l=>{if(!l.el)return;const on=h&&h.edges.has(l.key);l.el.classList.toggle('dim',!!h&&!on);l.el.classList.toggle('hot',!!on)});
+  },
+  run(){if(this.raf)return;const step=()=>{this.tick();if(this.alpha>0.015){this.raf=requestAnimationFrame(step)}else{this.raf=0;if(!this.moved)this.fit()}};this.raf=requestAnimationFrame(step)},
+  tick(){
+    const ns=this.nodes,a=this.alpha;
+    const W=$('#svg').clientWidth||600,H=$('#svg').clientHeight||400;
+    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){const p=ns[i],q=ns[j];let dx=p.x-q.x,dy=p.y-q.y,d2=dx*dx+dy*dy||1;if(d2>90000)continue;const f=5200/d2*a,d=Math.sqrt(d2);dx/=d;dy/=d;p.vx+=dx*f;p.vy+=dy*f;q.vx-=dx*f;q.vy-=dy*f}
+    this.links.forEach(l=>{if(l.self)return;const p=l.a,q=l.b;let dx=q.x-p.x,dy=q.y-p.y,d=Math.sqrt(dx*dx+dy*dy)||1;const f=(d-(this.sample?90:150))*0.02*a;dx/=d;dy/=d;p.vx+=dx*f;p.vy+=dy*f;q.vx-=dx*f;q.vy-=dy*f});
+    ns.forEach(n=>{n.vx+=(W/2-n.x)*0.004*a;n.vy+=(H/2-n.y)*0.004*a;if(!n.fixed){n.x+=n.vx;n.y+=n.vy}n.vx*=.78;n.vy*=.78});
+    this.alpha*=0.972;this.paint();
+  },
+  paint(){
+    this.nodes.forEach(n=>n.el&&n.el.setAttribute('transform',`translate(${n.x},${n.y})`));
+    this.links.forEach(l=>{if(!l.el)return;const p=l.a,q=l.b,path=l.el.querySelector('path'),tx=l.el.querySelector('text');
+      if(l.self){const r=p.r;path.setAttribute('d',`M${p.x-6},${p.y-r} C${p.x-50},${p.y-r-55} ${p.x+50},${p.y-r-55} ${p.x+6},${p.y-r-2}`);tx.setAttribute('x',p.x);tx.setAttribute('y',p.y-r-44);return}
+      const dx=q.x-p.x,dy=q.y-p.y,d=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/d,uy=dy/d,off=(l.idx%2?1:-1)*Math.ceil(l.idx/2)*34+(l.idx? 0:0);
+      const sx=p.x+ux*(p.r+1),sy=p.y+uy*(p.r+1),ex=q.x-ux*(q.r+4),ey=q.y-uy*(q.r+4);
+      const mx=(sx+ex)/2-uy*off,my=(sy+ey)/2+ux*off;
+      path.setAttribute('d',l.idx?`M${sx},${sy} Q${mx},${my} ${ex},${ey}`:`M${sx},${sy} L${ex},${ey}`);
+      tx.setAttribute('x',l.idx?(sx+2*mx+ex)/4:(sx+ex)/2);tx.setAttribute('y',(l.idx?(sy+2*my+ey)/4:(sy+ey)/2)-3)});
+  },
+  fit(){
+    if(!this.nodes.length)return;const W=$('#svg').clientWidth,H=$('#svg').clientHeight;
+    let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;this.nodes.forEach(n=>{x0=Math.min(x0,n.x-n.r-30);x1=Math.max(x1,n.x+n.r+30);y0=Math.min(y0,n.y-n.r-20);y1=Math.max(y1,n.y+n.r+30)});
+    const k=Math.min(1.3,Math.min(W/(x1-x0),H/(y1-y0)));this.view.k=k;this.view.x=W/2-k*(x0+x1)/2;this.view.y=H/2-k*(y0+y1)/2;this.applyView()},
+  applyView(){const v=this.view;$('#vp').setAttribute('transform',`translate(${v.x},${v.y}) scale(${v.k})`)},
+  dragStart(e,n){e.stopPropagation();n._drag=false;const sx=e.clientX,sy=e.clientY,ox=n.x,oy=n.y,k=this.view.k;n.fixed=true;
+    const mv=ev=>{const dx=(ev.clientX-sx)/k,dy=(ev.clientY-sy)/k;if(Math.abs(dx)+Math.abs(dy)>3)n._drag=true;n.x=ox+dx;n.y=oy+dy;this.moved=true;this.paint()};
+    const up=()=>{window.removeEventListener('pointermove',mv);window.removeEventListener('pointerup',up);n.fixed=false;setTimeout(()=>n._drag=false,0);if(n._drag){this.alpha=.3;this.run()}};
+    window.addEventListener('pointermove',mv);window.addEventListener('pointerup',up)},
+};
+(function(){
+  const svg=$('#svg');let pan=null;
+  svg.addEventListener('pointerdown',e=>{if(e.target!==svg&&e.target.id!=='vp')return;pan={x:e.clientX,y:e.clientY,vx:GR.view.x,vy:GR.view.y};svg.style.cursor='grabbing'});
+  window.addEventListener('pointermove',e=>{if(!pan)return;GR.view.x=pan.vx+e.clientX-pan.x;GR.view.y=pan.vy+e.clientY-pan.y;GR.moved=true;GR.applyView()});
+  window.addEventListener('pointerup',()=>{pan=null;svg.style.cursor='grab'});
+  svg.addEventListener('wheel',e=>{e.preventDefault();const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top,v=GR.view,f=e.deltaY<0?1.12:.89,nk=Math.max(.25,Math.min(3,v.k*f));v.x=mx-(mx-v.x)*nk/v.k;v.y=my-(my-v.y)*nk/v.k;v.k=nk;GR.moved=true;GR.applyView()},{passive:false});
+  svg.addEventListener('click',e=>{if(e.target===svg||e.target.id==='vp'){$('#drawer').hidden=true}});
+})();
+$('#fit').onclick=()=>{GR.moved=false;GR.fit()};
+$('#clr').onclick=()=>{GR.hl=null;GR.applyHl()};
+$('#ex').onclick=async()=>{
+  if(!GR.sample){
+    if(!S.sample||S.sample_stale){$('#ex').disabled=true;$('#ex').textContent='Creating example…';
+      try{render(await api(`/session/${sid}/sample`,'POST'))}catch(e){err(e);$('#ex').disabled=false;$('#ex').textContent='Show example data';return}$('#ex').disabled=false}
+    GR.sample=true;$('#ex').textContent='Back to the map';
+  }else{GR.sample=false;$('#ex').textContent='Show example data'}
+  GR.hl=null;GR.moved=false;$('#drawer').hidden=true;GR.sync();
+};
+function highlight(nodes,edges){GR.hl={nodes:new Set(nodes),edges:new Set(edges)};if(GR.sample){GR.sample=false;$('#ex').textContent='Show example data';GR.sync()}setTab('map');GR.applyHl()}
+
+/* ---------------- node explorer ---------------- */
+async function openNode(n){
+  const d=$('#drawer');d.hidden=false;
+  if(GR.sample){
+    const outs=GR.links.filter(l=>l.s===n.id),ins=GR.links.filter(l=>l.t===n.id);
+    d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button><h3>${esc(n.label)}</h3><div class="mute">An example of <b>${esc(n.klass)}</b> (fictional)</div>
+    <h4>Connected to</h4><ul class="tight">${outs.map(l=>`<li>${esc(l.label.toLowerCase().replace(/_/g,' '))} → <b>${esc(l.b.label)}</b></li>`).join('')}${ins.map(l=>`<li><b>${esc(l.a.label)}</b> ${esc(l.label.toLowerCase().replace(/_/g,' '))} → this</li>`).join('')||''}</ul>`;
+    GR.hl={nodes:new Set([n.id,...outs.map(l=>l.t),...ins.map(l=>l.s)]),edges:new Set([...outs,...ins].map(l=>l.key))};GR.applyHl();return}
+  d.innerHTML='<div class="mute">Loading…</div>';
+  try{
+    const x=await api(`/session/${sid}/node/${encodeURIComponent(n.id)}`);const c=x.class;
+    const nb=new Set([c.name]),eg=new Set();[...x.outgoing,...x.incoming].forEach(r=>{nb.add(r.from);nb.add(r.to);eg.add(`${r.name}|${r.from}|${r.to}`)});
+    GR.hl={nodes:nb,edges:eg};GR.applyHl();
+    const rel=r=>{const o=r.from===c.name;const other=o?r.to:r.from;return `<li>${o?'':'<span class="mute">← </span>'}<b>${esc(r.name.replace(/_/g,' ').toLowerCase())}</b> ${o?'→':'from'} <span class="link" data-n="${esc(other)}">${esc(other)}</span><div class="mute" style="font-size:12px">${esc(r.description||'')}</div></li>`};
+    d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true;GR.hl=null;GR.applyHl()">×</button>
+    <h3>${esc(c.name)}</h3><div class="mute">${esc(c.layer||'')}${c.parent?' · kind of '+esc(c.parent):''}${c.stub?' · <span style="color:#C27A00">not described yet</span>':''}</div>
+    <p>${esc(c.description)}</p>
+    ${c.why?`<h4>Why it is here</h4><div>${esc(c.why)}</div>`:''}
+    ${c.example?`<h4>Example</h4><div>${esc(c.example)}</div>`:''}
+    ${c.source_quote?`<h4>In your words</h4><div class="quote">“${esc(c.source_quote)}”</div><div class="mute" style="font-size:12px">Heard in: ${esc(c.source)}</div>`:`<div class="mute" style="font-size:12px;margin-top:8px">Heard in: ${esc(c.source)}</div>`}
+    <h4>Connections (${x.outgoing.length+x.incoming.length})</h4><ul class="tight">${[...x.outgoing,...x.incoming].map(rel).join('')||'<li class="mute">None yet</li>'}</ul>
+    <h4>Details held</h4>${x.properties.length?`<ul class="tight">${x.properties.map(p=>`<li><b>${esc(p.name)}</b> <span class="mute">(${esc(p.type)})</span> ${esc(p.description)}</li>`).join('')}</ul>`:'<div class="mute">None yet</div>'}
+    <h4>Rules that apply</h4>${x.rules.length?`<ul class="tight">${x.rules.map(r=>`<li><span class="pill">${esc(r.category)}</span> ${esc(r.text)}</li>`).join('')}</ul>`:'<div class="mute">None yet</div>'}
+    <h4>Questions it helps answer</h4>${x.questions.length?`<ul class="tight">${x.questions.map(q=>`<li>${esc(q.question)} <span class="st ${q.status}">${q.status==='yes'?'answerable':q.status==='partial'?'partly':'not yet'}</span></li>`).join('')}</ul>`:'<div class="mute">Try some in the “Test it” tab</div>'}
+    <h4>Something wrong?</h4><textarea id="chtxt" rows="2" placeholder="e.g. This is actually two different things / rename it / wrong connection"></textarea><button class="btn sm" style="margin-top:6px" id="chgo">Fix it</button>`;
+    d.querySelectorAll('.link').forEach(a=>a.onclick=()=>{const t=GR.nodes.find(z=>z.id===a.dataset.n);if(t)openNode(t)});
+    $('#chgo').onclick=()=>challenge(`About "${c.name}": `+$('#chtxt').value,$('#chgo'));
+  }catch(e){d.innerHTML=`<button class="x" onclick="$('#drawer').hidden=true">×</button><div>${esc(e.message)}</div>`}
+}
+async function challenge(text,btn){
+  if(text.replace(/^About "[^"]*":\s*/,'').trim().length<3)return toast('Tell us what is wrong first');
+  if(btn){btn.disabled=true;btn.textContent='Working…'}
+  try{const v=await api(`/session/${sid}/challenge`,'POST',{text});render(v);toast(v.challenge_reply||'Updated');if(!$('#drawer').hidden){$('#drawer').hidden=true}}
+  catch(e){err(e)} finally{if(btn){btn.disabled=false;btn.textContent='Fix it'}}
+}
+
+/* ---------------- arena ---------------- */
+function renderArena(){
+  const p=$('#p-arena');
+  const keep=$('#aq')?$('#aq').value:'';
+  const stat={yes:['Answerable','yes'],partial:['Partly','partial'],no:['Not yet','no']};
+  p.innerHTML=`<div class="sect"><h4 style="font-size:16px">Test your map with real questions</h4>
+    <div class="mute">Ask something you wish you could answer instantly. We show the path through your map that would answer it, or the gap that stops it. Fixing gaps raises your score.</div>
+    <textarea id="aq" rows="2" placeholder="e.g. Which customers share a device with an account that raised an alert?" style="margin-top:10px">${esc(keep)}</textarea>
+    <div style="margin-top:8px;display:flex;gap:8px"><button class="btn" id="agoo">Test this question</button><button class="btn ghost" id="asug">Suggest questions</button></div>
+    <div id="sugs" style="margin-top:8px"></div></div>
+    ${S.questions.slice().reverse().map(q=>{const [lab,cl]=stat[q.status]||['?','no'];return `<div class="q" data-id="${q.id}">
+      <div><span class="st ${cl}">${lab}</span><b>${esc(q.question)}</b></div>
+      ${q.steps.length?`<div style="margin-top:8px"><div class="mute" style="font-size:12px">How the map answers it</div>${q.steps.map(s=>`<div><span class="step-line">${esc(s.text)}</span></div>`).join('')}</div>`:''}
+      ${q.gaps.map((g,i)=>`<div class="gap"><span>🔍 ${esc(g.text)}</span><button class="btn sm fix" data-i="${i}">Add to map</button></div>`).join('')}
+      ${q.nodes.length?`<div style="margin-top:8px"><button class="btn ghost sm show">Show on map</button></div>`:''}</div>`}).join('')||'<div class="mute">No questions yet. Try “Suggest questions”.</div>'}`;
+  $('#agoo').onclick=async()=>{const t=$('#aq').value.trim();if(!t)return;$('#agoo').disabled=true;$('#agoo').textContent='Checking…';
+    try{const v=await api(`/session/${sid}/arena`,'POST',{question:t});const before=S.score;$('#aq').value='';render(v);if(v.question.status==='yes')toast('✓ Your map can answer that',true);else toast('Found '+v.question.gaps.length+' gap(s). Add them to the map.');}
+    catch(e){err(e);$('#agoo').disabled=false;$('#agoo').textContent='Test this question'}};
+  $('#asug').onclick=async()=>{$('#asug').disabled=true;try{const r=await api(`/session/${sid}/arena/suggest`,'POST');$('#sugs').innerHTML=r.questions.map(q=>`<div><span class="link sg">${esc(q)}</span></div>`).join('');document.querySelectorAll('.sg').forEach(a=>a.onclick=()=>{$('#aq').value=a.textContent;$('#aq').focus()})}catch(e){err(e)}$('#asug').disabled=false};
+  p.querySelectorAll('.q').forEach(card=>{const q=S.questions.find(x=>x.id===card.dataset.id);
+    card.querySelectorAll('.fix').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Adding…';try{const v=await api(`/session/${sid}/arena/${q.id}/fix`,'POST',{gap_index:+b.dataset.i});render(v);toast(v.fix_reply||'Added to the map')}catch(e){err(e);b.disabled=false;b.textContent='Add to map'}});
+    const sh=card.querySelector('.show');if(sh)sh.onclick=()=>highlight(q.nodes,q.edges)});
+}
+
+/* ---------------- story ---------------- */
+function renderStory(){
+  const p=$('#p-story');const s=S.story;
+  if(!s){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">Explain it in plain words</h4><div class="mute">Get a short walkthrough of your map, plus a justification for every design choice, tied to what you told us.</div><button class="btn" id="sgo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Explain my map</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}`;
+    const b=$('#sgo');if(b)b.onclick=genStory;return}
+  p.innerHTML=`${S.story_stale?`<div class="gap" style="margin-bottom:12px"><span>The map changed since this was written.</span><button class="btn sm" id="sgo">Refresh</button></div>`:''}
+    <h2 style="margin:0 0 6px;color:var(--blue)">${esc(s.headline)}</h2>
+    <div class="q" style="background:#f6f9ff"><b>In one minute</b><div style="margin-top:4px">${esc(s.one_minute)}</div></div>
+    ${(s.sections||[]).map(x=>`<div class="sect"><h4>${esc(x.title)}</h4><div>${esc(x.body)}</div></div>`).join('')}
+    <h3 style="color:var(--blue);margin-bottom:6px">Why we built it this way</h3>
+    ${(s.design_choices||[]).map(x=>`<div class="q"><b>${esc(x.choice)}</b><div>${esc(x.why)}</div><div class="mute" style="font-size:12px">Other option: ${esc(x.alternative)}</div></div>`).join('')}
+    <h3 style="color:var(--blue);margin-bottom:6px">What this unlocks</h3><ul class="tight">${(s.unlocks||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+    <h3 style="color:var(--blue);margin-bottom:6px">Honest limits</h3><ul class="tight">${(s.watch_outs||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+  const b=$('#sgo');if(b)b.onclick=genStory;
+}
+async function genStory(){const b=$('#sgo');b.disabled=true;b.textContent='Writing…';try{render(await api(`/session/${sid}/story`,'POST'))}catch(e){err(e);b.disabled=false;b.textContent='Explain my map'}}
+
+/* ---------------- history + challenge ---------------- */
+function renderHist(){
+  const p=$('#p-hist');
+  p.innerHTML=`<h4 style="font-size:16px;margin-top:0">Tell us what's wrong or missing</h4><textarea id="gch" rows="2" placeholder="e.g. 'Branch' should be split into Branch and Region. Or: remove Merchant, we do not deal with them."></textarea><button class="btn sm" style="margin:6px 0 16px" id="gchgo">Update the map</button>
+  <h4 style="font-size:16px">What changed</h4>${S.changelog.slice().reverse().map(x=>`<div class="hist"><span class="mute">${esc(x.ts.slice(11,16))}</span> <b>${esc(x.action)}</b> ${esc(x.detail)}</div>`).join('')||'<div class="mute">Nothing yet</div>'}`;
+  $('#gchgo').onclick=()=>challenge($('#gch').value,$('#gchgo'));
+}
+
+/* ---------------- reveal ---------------- */
+function reveal(){
+  const m=$('#modal');m.hidden=false;
+  m.innerHTML=`<div class="card"><h1>You just built an ontology</h1>
+  <p>That is the technical name for what is on your screen: an agreed, written-down map of the things your business deals with, how they connect, and the rules that govern them.</p>
+  <p><b>Yours has ${S.counts.things} things, ${S.counts.connections} connections, ${S.counts.details} details and ${S.counts.rules} rules.</b></p>
+  <ul class="tight"><li><b>For people:</b> everyone uses the same words and sees the same picture.</li><li><b>For AI:</b> it can follow real connections and cite why, instead of guessing from loose text.</li><li><b>For audit:</b> every element traces back to what you told us.</li></ul>
+  <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap"><a class="btn" style="text-decoration:none" href="/api/session/${sid}/export.xlsx">Download the Excel</a><button class="btn ghost" id="mc">Keep exploring</button></div></div>`;
+  $('#mc').onclick=()=>m.hidden=true;
+}
+$('#reveal').onclick=reveal;
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')$('#modal').hidden=true});
+
+initLanding().catch(err);
+</script>
+</body>
+</html>
