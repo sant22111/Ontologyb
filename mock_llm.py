@@ -96,6 +96,7 @@ def _norm(s):
 
 
 DRAFT = {
+    "findings": ["Sells mainly through distributors to small retailers", "Runs trade schemes to push volume", "Field sales reps cover shops on routes"],
     "headaches": ["Trade scheme costs are hard to link back to the shops they reached", "Distributor stock and shop orders sit in different files", "Nobody can quickly see which shops a sales rep covers"],
     "summary": "A typical consumer-goods map: products, the distributors and shops that carry them, and the orders and schemes between. Based on how this kind of business usually works.",
     "delta": {
@@ -134,10 +135,16 @@ def respond(task, ctx):
     if task == "draft":
         import copy
         return copy.deepcopy(DRAFT)
+    if task == "docguide":
+        return {"intro": "Share the documents that show how orders, schemes and distributors are handled day to day.",
+                "documents": [
+                    {"title": "Trade scheme policy or circular", "why": "Trade spend is a worry for this client and the map has no scheme rules yet.", "look_for": "How a scheme is approved, who it applies to, how long it runs.", "format": "PDF or Word", "avoid": "Individual distributor names and figures"},
+                    {"title": "Distributor onboarding form", "why": "Shows what the business records about a distributor.", "look_for": "The fields on the form.", "format": "Word or PDF", "avoid": "Filled-in forms with real details"}],
+                "excel_tip": "An order or primary-sales extract with its column headings is ideal. Only the headings are read."}
     if task == "enrich":
         have = {c.lower() for c in classes}
         add = [c for c in ("Warehouse", "Promotion") if c.lower() not in have]
-        return {"summary": "Added a few things typical for this kind of business.",
+        return {"summary": "Added a few things typical for this kind of business.", "findings": ["Stock is held in warehouses between plant and distributor"],
                 "delta": {"classes": [{"name": n, "layer": "General", "description": f"A {n.lower()} the business works with.", "why": "Commonly part of this kind of business.", "example": ""} for n in add],
                           "relationships": [{"name": "USES", "from": "Order", "to": n, "description": f"An order may involve a {n.lower()}"} for n in add if "Order" in classes]}}
     if task == "doc":
@@ -145,7 +152,7 @@ def respond(task, ctx):
         if len(words) < 8:
             return {"summary": "Nothing usable.", "delta": {}}
         quote = " ".join(words[:8])
-        return {"summary": "A short document.", "delta": {
+        return {"summary": "A short document.", "findings": ["The document states an approval limit: " + quote], "delta": {
             "classes": [{"name": "PolicyDocument", "layer": "Documents", "description": "A document the client shared.", "why": "Source of rules.", "example": "", "source_quote": quote}],
             "rules": [{"text": "Stated in the document: " + quote, "category": "compliance", "applies_to": ["PolicyDocument"], "source_quote": quote},
                       {"text": "An invented rule that the document never says", "category": "business", "applies_to": ["PolicyDocument"], "source_quote": "this phrase does not appear anywhere in it"}]}}

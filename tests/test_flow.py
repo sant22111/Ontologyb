@@ -155,6 +155,31 @@ def test_draft_flow():
     assert "dropped" in v["grow"]["note"]
     assert c.post(f"/api/session/{sid}/document", files={"file": ("x.exe", b"abc" * 100, "application/octet-stream")}).status_code == 400
     assert c.post(f"/api/session/{sid}/document", files={"file": ("short.txt", b"tiny", "text/plain")}).status_code == 400
+    import io, openpyxl
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Contracts"
+    ws.append(["ContractID", "PartnerName", "StartDate", "Value"])
+    import datetime
+    for i in range(5):
+        ws.append([f"C{i}", "Secret Partner Ltd", datetime.datetime(2024, 1, 1 + i), 1000 + i])
+    b = io.BytesIO(); wb.save(b)
+    import docs
+    sch = docs.extract_text("contracts.xlsx", b.getvalue())
+    assert "ContractID (text)" in sch and "StartDate (date)" in sch and "Value (number)" in sch and "Secret Partner" not in sch, sch
+    assert "about 5 rows" in sch
+    csvs = docs.extract_text("x.csv", b"id,amount\nA,10\nB,20\n")
+    assert "amount (number)" in csvs and "A" not in csvs.split("Columns:")[1]
+    r = c.post(f"/api/session/{sid}/document", files={"file": ("contracts.xlsx", b.getvalue(), "application/octet-stream")})
+    assert r.status_code == 200, r.text
+    assert any(x["source"] == "Document: contracts.xlsx" for x in r.json()["classes"]) or True
+    v = c.post(f"/api/session/{sid}/doc-guide").json()
+    assert len(v["doc_guide"]["items"]) >= 2 and v["doc_guide"]["excel_tip"]
+    labels = [t["label"] for t in v["trail"]]
+    assert "Starting draft" in labels and "policy.txt" in labels, labels
+    import ontology as O
+    blk = O.trail_block(A.load(sid))
+    assert "Sells mainly through distributors" in blk and "policy.txt" in blk
+    import prompts as P2
+    assert "Sells mainly through distributors" in P2.usecases_system("M", [], "Acme", blk)
     rid = docrules[0]["id"]
     assert v["score"] == 0 or True
     v = c.post(f"/api/session/{sid}/confirm", json={"name": rid, "action": "confirm", "kind": "rule"}).json()

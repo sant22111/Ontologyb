@@ -101,6 +101,7 @@ def sig(st):
 def present(st, include_messages=True):
     v = ont.view(st, include_messages)
     v["story_stale"] = bool(st["story"]) and st["story"].get("sig") != sig(st)
+    v["doc_guide_stale"] = bool(st.get("doc_guide")) and st["doc_guide"].get("sig") != sig(st)
     v["usecases_stale"] = bool(st.get("usecases")) and st["usecases"].get("sig") != sig(st)
     v["sample_stale"] = bool(st["sample"]) and st["sample"].get("sig") != sig(st)
     v["llm"] = {"provider": llm.provider, "model": llm.model}
@@ -134,6 +135,7 @@ def build_draft(st):
         ont.mark_draft(st)
         st["draft"] = {"basis": "web" if urls else "general", "sources": urls,
                        "summary": str(obj.get("summary", ""))[:400] if isinstance(obj, dict) else ""}
+        ont.trail_add(st, "research", "Starting draft", obj.get("summary", "") if isinstance(obj, dict) else "", obj.get("findings") if isinstance(obj, dict) else [], urls)
         st["headaches"] = [str(h)[:160] for h in (obj.get("headaches") or []) if isinstance(h, str)][:8] if isinstance(obj, dict) else []
         ont.log(st, "draft", "Starting draft prepared (" + (f"{len(urls)} public web pages: " + "; ".join(urls) if urls else "general knowledge only, no web pages read") + ")")
     except Exception as e:  # the workshop still works without the draft
@@ -148,7 +150,7 @@ def interview_turn(st, user_text):
     s = ont.summary(st)
     drafts = [k for k, c in st["classes"].items() if c.get("draft")]
     tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else "No template; start from the client's own words."
-    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""), drafts, st.get("goals"))
+    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""), drafts, st.get("goals"), ont.trail_block(st))
     ctx = {"turn": turn, "classes": list(st["classes"].keys()), "drafts": bool(drafts)}
     try:
         res = ai("interview", system, llm_history(st), ctx)
@@ -261,7 +263,7 @@ def suggest_more(sid: str, body: More):
         if not st["classes"]:
             raise HTTPException(400, "Build a few things on the map first")
         topic = body.topic.strip()[:200]
-        system = P.enrich_system(ont.context_block(st), st.get("client", ""), st.get("about", ""), st.get("goals"), topic)
+        system = P.enrich_system(ont.context_block(st), st.get("client", ""), st.get("about", ""), st.get("goals"), topic, ont.trail_block(st))
         try:
             obj, urls = llm.research(system, f"Client: {st.get('client') or st['domain']}\nFocus: {topic or 'anything important missing'}", {"classes": list(st["classes"].keys())}, task="enrich")
         except LLMError as e:
@@ -271,6 +273,7 @@ def suggest_more(sid: str, body: More):
             delta.pop(k, None)
         res = ont.apply_delta(st, delta, "draft")
         ont.mark_draft(st, "draft")
+        ont.trail_add(st, "suggest more", topic or "Open suggestions", obj.get("summary", "") if isinstance(obj, dict) else "", obj.get("findings") if isinstance(obj, dict) else [], urls)
         ont.log(st, "suggest more", (f"Focus: {topic}. " if topic else "") + ("Read " + str(len(urls)) + " public pages: " + "; ".join(urls) if urls else "From general knowledge, no web pages read"))
         save(st)
     v = present(st)
@@ -288,14 +291,14 @@ async def add_document(sid: str, file: UploadFile = File(...)):
     except Exception:
         raise HTTPException(400, "Could not read that file. Try saving it as a text or Word file.")
     text = text.strip()
-    if len(text) < 200:
+    if len(text) < 60:
         raise HTTPException(400, "No readable text found. A scanned PDF needs to be converted to text first.")
     truncated = len(text) > docs.MAX_CHARS
     text = text[:docs.MAX_CHARS]
     fname = (file.filename or "document")[:80]
     with _lock(sid):
         st = load(sid)
-        system = P.doc_system(ont.context_block(st), st.get("client", ""), fname, text)
+        system = P.doc_system(ont.context_block(st), st.get("client", ""), fname, text, ont.trail_block(st))
         res = ai("doc", system, [{"role": "user", "content": "Extract what the document says."}], {"text": text, "classes": list(st["classes"].keys())}, max_tokens=5000)
         delta = res.get("delta") if isinstance(res.get("delta"), dict) else {}
         for k in ("remove", "rename", "confirm"):
@@ -319,6 +322,7 @@ async def add_document(sid: str, file: UploadFile = File(...)):
         source = f"Document: {fname}"
         out = ont.apply_delta(st, delta, source)
         ont.mark_draft(st, source)
+        ont.trail_add(st, "document", fname, res.get("summary", ""), res.get("findings"))
         ont.log(st, "document", f"Read {fname} ({len(text)} characters{', first part only' if truncated else ''}). Added for review: {out['added']['classes']} things, {out['added']['relationships']} connections, {out['added']['rules']} rules" + (f". Dropped {dropped} rule(s) whose quote was not in the document" if dropped else ""))
         save(st)
     v = present(st)
@@ -431,6 +435,24 @@ def arena_fix(sid: str, qid: str, body: Fix):
     return v
 
 
+@app.post("/api/session/{sid}/doc-guide")
+def doc_guide(sid: str):
+    with _lock(sid):
+        st = load(sid)
+        have = [t["label"] for t in st.get("trail", []) if t["step"] == "document"]
+        res = ai("docguide", P.docguide_system(ont.context_block(st), st.get("client", ""), st.get("about", ""), st.get("goals"), ont.trail_block(st), have),
+                 [{"role": "user", "content": "What should the client upload?"}], {}, max_tokens=2500)
+        items = []
+        for d in (res.get("documents") or [])[:6]:
+            if isinstance(d, dict) and d.get("title"):
+                items.append({k: str(d.get(k, ""))[:300] for k in ("title", "why", "look_for", "format", "avoid")})
+        if not items:
+            raise HTTPException(502, "The AI did not return suggestions. Try again.")
+        st["doc_guide"] = {"intro": str(res.get("intro", ""))[:300], "items": items, "excel_tip": str(res.get("excel_tip", ""))[:300], "sig": sig(st)}
+        save(st)
+    return present(st)
+
+
 @app.post("/api/session/{sid}/usecases")
 def usecases(sid: str):
     with _lock(sid):
@@ -438,7 +460,7 @@ def usecases(sid: str):
         if len(st["classes"]) < 3:
             raise HTTPException(400, "Add a few more things before asking for use cases")
         ctx = {"classes": list(st["classes"].keys())}
-        res = ai("usecases", P.usecases_system(ont.context_block(st), st.get("goals"), st.get("client", "")),
+        res = ai("usecases", P.usecases_system(ont.context_block(st), st.get("goals"), st.get("client", ""), ont.trail_block(st)),
                  [{"role": "user", "content": "Write the use cases."}], ctx, max_tokens=3000)
         items = []
         for u in (res.get("usecases") or [])[:5]:

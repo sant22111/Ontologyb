@@ -90,6 +90,8 @@ def new_state(domain, template=None, owner="", client="", about="", goals=None):
         "draft": None,
         "goals": [str(g).strip()[:200] for g in (goals or []) if str(g).strip()][:3],
         "usecases": None,
+        "trail": [],
+        "doc_guide": None,
         "story": None,
         "sample": None,
         "changelog": [],
@@ -301,6 +303,33 @@ def apply_delta(st, delta, source, overwrite=False):
 
 
 # ---------------------------------------------------------------- scoring
+def trail_add(st, step, label, summary, findings=None, sources=None):
+    st.setdefault("trail", []).append({
+        "ts": now(), "step": step, "label": label[:120], "summary": str(summary or "")[:500],
+        "findings": [str(f)[:200] for f in (findings or []) if isinstance(f, str)][:12],
+        "sources": [str(u)[:200] for u in (sources or [])][:8]})
+    st["trail"] = st["trail"][-12:]
+
+
+def trail_block(st, cap=3500):
+    """Everything learned so far, so each later step builds on it. Background, not confirmed fact."""
+    tr = st.get("trail") or []
+    if not tr:
+        return ""
+    def build(nf):
+        out = ["WHAT WE HAVE LEARNED SO FAR (public research and documents the client shared). This is unconfirmed background, not facts the client has confirmed:"]
+        for t in tr:
+            out.append(f"- [{t['step']}] {t['label']}: {t['summary']}")
+            for f in t["findings"][:nf]:
+                out.append(f"    * {f}")
+        return "\n".join(out)
+    for nf in (8, 5, 3, 1, 0):
+        txt = build(nf)
+        if len(txt) <= cap:
+            return txt
+    return txt[:cap]
+
+
 def mark_draft(st, source="draft"):
     """Everything added by research or from a document is an unconfirmed guess until the client says so."""
     for coll in (st["classes"].values(), st["relationships"], st["properties"], st["rules"]):
@@ -609,7 +638,7 @@ def view(st, include_messages=True):
         "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "client": st.get("client", ""), "about": st.get("about", ""), "created": st["created"], "updated": st["updated"],
         "template": st["template"], "classes": list(st["classes"].values()), "relationships": st["relationships"],
         "properties": st["properties"], "rules": st["rules"], "questions": st["questions"], "story": st["story"],
-        "sample": st["sample"], "draft": st.get("draft"), "pending_goals": st.get("pending_goals", False), "headaches": st.get("headaches", []), "goals": st.get("goals", []), "usecases": usecases_view(st), "changelog": st["changelog"][-60:], **s,
+        "sample": st["sample"], "draft": st.get("draft"), "doc_guide": st.get("doc_guide"), "trail": [{"step": t["step"], "label": t["label"], "ts": t["ts"]} for t in st.get("trail", [])], "pending_goals": st.get("pending_goals", False), "headaches": st.get("headaches", []), "goals": st.get("goals", []), "usecases": usecases_view(st), "changelog": st["changelog"][-60:], **s,
         "counts": {"things": len(st["classes"]), "connections": len(st["relationships"]), "details": len(st["properties"]),
                    "rules": len(st["rules"]), "questions": len(st["questions"]),
                    "drafts": sum(1 for c in st["classes"].values() if c.get("draft")) + sum(1 for r in st["rules"] if r.get("draft"))},

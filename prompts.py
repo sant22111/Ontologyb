@@ -39,11 +39,12 @@ def goals_block(goals):
     return "\nWHAT THE CLIENT WANTS TO FIX (their own picks): " + "; ".join(goals) + ". Steer the questions toward what the map needs in order to solve these, and say so when a question serves one of them."
 
 
-def usecases_system(context_block, goals, client):
+def usecases_system(context_block, goals, client, trail=""):
     g = "; ".join(goals) if goals else "(not stated)"
     return f"""Write practical use cases showing how this business map would be used day to day, for a smart executive who does not know what a map like this is for. Plain business language. Never use these words: {BANNED}
 Client: {client or "(not named)"}
 What they said they want to fix: {g}
+{trail}
 MAP:
 {context_block}
 
@@ -62,26 +63,28 @@ Team notes: {about or "(none)"}
 If you have a web search tool, use it to read public information about this client (its website, annual report, investor material, products, sales channels, systems and regulation that apply). If you find nothing specific, base the draft on what is typical for this kind of business and say so.
 Everything you produce is an UNCONFIRMED GUESS for the client to confirm or correct. Never invent figures, names of people, or internal systems you have no basis for.
 
-Reply with ONLY JSON: {{"basis":"web or general","summary":"two plain sentences: what the draft covers and what it is based on","headaches":["6 to 8 everyday problems, in the client's own business language, that a business like this typically has and a shared map would help with. Specific to this client's world, no jargon, each under 20 words"],"delta":{{...}}}}
+Reply with ONLY JSON: {{"basis":"web or general","summary":"two plain sentences: what the draft covers and what it is based on","findings":["8 to 12 short factual notes you found or relied on, one line each, most useful first"],"headaches":["6 to 8 everyday problems, in the client's own business language, that a business like this typically has and a shared map would help with. Specific to this client's world, no jargon, each under 20 words"],"delta":{{...}}}}
 {DELTA_SPEC}
 Overrides for the draft: leave source_quote empty everywhere. Give 8 to 12 classes, 8 to 14 relationships, and 2 to 4 properties for each of the 5 most important classes. Do not include rules. Never use these words in descriptions: {BANNED}"""
 
 
-def enrich_system(context_block, client, about, goals, topic):
+def enrich_system(context_block, client, about, goals, topic, trail=""):
     return f"""You are extending an existing business map with a few more things the client has not mentioned yet. If you have a web search tool, use it to read public information about the client and the topic.
 Client: {client or "(not named)"}. Team notes: {about or "(none)"}.{goals_block(goals)}
 Focus: {topic or "whatever important parts of this business the map is still missing"}
+{trail}
 CURRENT MAP:
 {context_block}
 
 Propose ADDITIONS ONLY: 3 to 8 new classes, their connections to things already on the map, and 2 to 3 details for the new ones. Do not repeat or reword anything already on the map. Everything is an unconfirmed guess for the client to keep or remove. Never invent figures or names. Leave source_quote empty. Do not include rules. Never use these words in descriptions: {BANNED}
-Reply with ONLY JSON: {{"summary":"one plain sentence on what you added and why","delta":{{...}}}}
+Reply with ONLY JSON: {{"summary":"one plain sentence on what you added and why","findings":["3 to 6 short factual notes you found or relied on, one line each"],"delta":{{...}}}}
 {DELTA_SPEC}"""
 
 
-def doc_system(context_block, client, filename, text):
+def doc_system(context_block, client, filename, text, trail=""):
     return f"""You are reading a document the client shared and extracting what it says about how their business works, to add to their business map.
 Client: {client or "(not named)"}. Document: {filename}
+{trail}
 CURRENT MAP (do not repeat what is already there):
 {context_block}
 
@@ -89,17 +92,34 @@ Rules for extraction:
 - Use ONLY what the document says. Never add outside knowledge.
 - You are mapping KINDS of things, not individual records. If the document names specific cases (a particular contract, person, field, invoice), do not make each one its own thing. Make the kind ("Contract", "Field") and put one named case in "example". Ignore long lists of records and figures.
 - Table headings, form fields and column names are good sources for details (properties) of a thing.
+- If the text starts with SPREADSHEET:, only sheet names, column headings and column types are shown, never data. Each sheet is probably a kind of thing, its columns are its details, and a column that appears in two sheets (such as a contract number) points to a connection between them. For source_quote copy a fragment of the "SHEET:" or "Columns:" line exactly.
 - For every class, relationship and rule, set source_quote to an exact, verbatim sentence or phrase from the document (max 25 words, copied character for character). Anything without a real quote will be discarded.
 - Include rules the document states: who decides (authority), deadlines and expiries (time), exceptions, compliance limits. Rules must have applies_to naming classes.
 - 3 to 10 classes, their relationships, 2 to 3 details for the important ones, and as many rules as the document clearly states.
 - Never use these words in descriptions: {BANNED}
-Reply with ONLY JSON: {{"summary":"two plain sentences on what the document covers","delta":{{...}}}}
+Reply with ONLY JSON: {{"summary":"two plain sentences on what the document covers","findings":["3 to 6 key points the document makes about how the business works, one line each"],"delta":{{...}}}}
 {DELTA_SPEC}
 
 DOCUMENT TEXT (between the markers):
 <<<START>>>
 {text}
 <<<END>>>"""
+
+
+def docguide_system(context_block, client, about, goals, trail, have):
+    return f"""You are advising a client on WHICH documents and spreadsheets to share so their business map can be completed. Be specific to THIS client, using everything learned so far. Plain business language. Never use these words: {BANNED}
+Client: {client or "(not named)"}. Team notes: {about or "(none)"}.{goals_block(goals)}
+{trail}
+Already shared: {", ".join(have) if have else "nothing yet"}
+CURRENT MAP:
+{context_block}
+
+Look at what the map still lacks (thin areas, things mentioned but not described, rules not yet captured, problems the client wants to fix) and what the research suggests exists in a business like this. Then name 4 to 6 documents the client probably already has.
+A map describes KINDS of things and the rules between them, so favour: contract or agreement templates, policies and SOPs, process notes, approval matrices, org charts, forms, data dictionaries, and Excel files whose column headings show what is tracked. Never ask for raw data or lists of records.
+Reply with ONLY JSON:
+{{"intro":"one plain sentence on what would help most and why, tied to this client",
+ "documents":[{{"title":"specific document type, in this client's words","why":"which gap or goal of THIS client it fills, one sentence","look_for":"what the file should contain, one sentence","format":"PDF, Word or Excel","avoid":"what to leave out, e.g. names, figures, personal data"}}],
+ "excel_tip":"one sentence on which spreadsheet would be most useful for this client (only the column headings are read)"}}"""
 
 
 def draft_block(names):
@@ -113,11 +133,12 @@ Draft things: {", ".join(names)}.
 - Things the client adds themselves are confirmed and need no flag."""
 
 
-def interview_system(domain, template_note, stage, context_block, stubs, client="", about="", drafts=None, goals=None):
+def interview_system(domain, template_note, stage, context_block, stubs, client="", about="", drafts=None, goals=None, trail=""):
     name, focus = STAGES[stage]
     return f"""You are a friendly senior business analyst running a live workshop with a client who is NOT technical.
 Area being mapped: {domain}.
 {template_note}{client_block(client, about)}{goals_block(goals)}{draft_block(drafts)}
+{trail}
 
 Never use these words with the client: {BANNED}
 
