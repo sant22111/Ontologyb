@@ -140,7 +140,8 @@ ul.tight{margin:4px 0 0;padding-left:18px}
     <label for="domain">What area are we mapping?</label>
     <input id="domain" placeholder="e.g. Retail banking fraud, GST litigation, Telecom compliance" maxlength="120">
     <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:500"><input type="checkbox" id="research" checked style="width:auto;margin-top:3px"><span>Prepare a starting draft from public information about this client<span class="mute" style="display:block;font-weight:400;font-size:12px">Takes up to a minute. The AI reads public web pages and pre-fills a base map. Everything starts as a dashed guess, and the client confirms or corrects it. Needs a client name.</span></span></label>
-    <div id="goalsbox"><label>What would you most like to fix? <span class="mute" style="font-weight:400">(pick up to 3)</span></label>
+    <div id="goalsnote" class="mute" style="font-size:13px;margin-top:14px;padding:10px 12px;background:#EAF6FD;border:1px solid #0091DA;border-radius:8px" hidden>✓ After the research runs, you will pick the problems you want to fix from a list <b>written for this client</b>. Untick the draft box above to choose from a general list now instead.</div>
+  <div id="goalsbox"><label>What would you most like to fix? <span class="mute" style="font-weight:400">(pick up to 3)</span></label>
     <div id="goals" style="margin-top:4px"></div></div>
     <label for="about">Anything we should know? <span class="mute" style="font-weight:400">(optional)</span></label>
     <textarea id="about" rows="2" maxlength="1200" placeholder="e.g. sells through 40 distributors, uses SAP and a DMS, trade spend is a worry"></textarea>
@@ -250,7 +251,7 @@ $('#begin').onclick=async()=>{
   catch(e){err(e)} finally{$('#begin').disabled=false;$('#begin').textContent='Begin'}
 };
 $('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
-function syncGoalsBox(){$('#goalsbox').hidden=$('#research').checked&&!!$('#client').value.trim()}
+function syncGoalsBox(){const r=$('#research').checked&&!!$('#client').value.trim();$('#goalsbox').hidden=r;$('#goalsnote').hidden=!r}
 $('#research').onchange=syncGoalsBox;$('#client').addEventListener('input',syncGoalsBox);syncGoalsBox();
 function goalList(el,items){el.innerHTML=items.map(g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`).join('');el.onchange=()=>{const on=el.querySelectorAll('input:checked').length;el.querySelectorAll('input:not(:checked)').forEach(i=>i.disabled=on>=3)}}
 function showPick(v){
