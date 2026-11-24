@@ -108,6 +108,10 @@ ul.tight{margin:4px 0 0;padding-left:18px}
 .growrow input[type=text]{flex:1}
 .node.draft circle{stroke-dasharray:4 3;stroke:#0091DA;stroke-width:2;fill-opacity:.4}
 .edge.draft path{stroke-dasharray:4 3}
+#next{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 14px;background:#EAF6FD;border-bottom:1px solid #0091DA;font-size:13px}
+#next[hidden]{display:none}
+#next b{color:var(--blue)}
+#tabhelp{font-size:12px;color:var(--mute);padding:6px 14px;border-bottom:1px solid var(--line)}
 #mnav,#bbtn{display:none}
 #navmap.ping::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#C0392B;margin-left:6px;vertical-align:middle}
 @media(max-width:900px){
@@ -179,6 +183,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
       <button class="btn ghost sm" id="home">Sessions</button>
     </div>
   </header>
+  <div id="next" hidden><span id="nexttxt"></span><button class="btn sm" id="nextbtn"></button></div>
   <main>
     <section class="panel" id="leftp">
       <div class="steps" id="steps"></div>
@@ -195,6 +200,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
         <button class="tab" data-t="hist">Changes</button>
         <span class="sp"></span><span class="mute" id="counts" style="font-size:12px;padding-right:8px"></span>
       </div>
+      <div id="tabhelp"></div>
       <div class="pane" id="p-map">
         <div id="mapwrap">
           <svg id="svg"><defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9aa7c2"/></marker></defs><g id="vp"><g id="gl"></g><g id="gn"></g></g></svg>
@@ -272,6 +278,21 @@ function enter(v){
   setTab('map');
 }
 
+/* ---------------- next step ---------------- */
+function nextStep(v){
+  const n=v.counts;
+  if(n.drafts>0)return {t:`<b>Next:</b> confirm the ${n.drafts} drafted item${n.drafts>1?'s':''} (keep what is right, remove what is not).`,b:'Review them',a:()=>{showView('map');setTab('map');openReview()}};
+  if(n.things<6)return {t:'<b>Next:</b> answer the questions in Chat so the map covers your world.',b:'Go to Chat',a:()=>showView('chat')};
+  if(n.rules<3)return {t:'<b>Next:</b> add the rules: who decides, deadlines, exceptions.',b:'Go to Chat',a:()=>showView('chat')};
+  if(n.questions<3)return {t:'<b>Next:</b> test 3 real questions on your map.',b:'Test it',a:()=>{showView('map');setTab('arena')}};
+  if(!v.usecases)return {t:'<b>Next:</b> see what you can do with this map.',b:'Use cases',a:()=>{showView('map');setTab('uses')}};
+  if(!v.story)return {t:'<b>Next:</b> get the plain-words explanation.',b:'Explain it',a:()=>{showView('map');setTab('story')}};
+  return {t:'<b>Looking good.</b> Download the Excel, or keep growing the map with documents.',b:'Grow',a:()=>{showView('map');setTab('map');openGrow()}};
+}
+let NEXTACT=null;
+function renderNext(v){const s=nextStep(v);$('#nexttxt').innerHTML=s.t;$('#nextbtn').textContent=s.b;NEXTACT=s.a;$('#next').hidden=false}
+$('#nextbtn').onclick=()=>NEXTACT&&NEXTACT();
+
 /* ---------------- render ---------------- */
 function render(v,first){
   const prev=S;S=v;
@@ -281,7 +302,7 @@ function render(v,first){
   $('#badges').innerHTML=v.badges.map(b=>`<span class="badge ${b.earned?'on':''}" title="${esc(b.hint)}">${b.earned?'★ ':''}${esc(b.name)}</span>`).join('');
   $('#counts').textContent=`${v.counts.things} things · ${v.counts.connections} connections · ${v.counts.rules} rules`;
   $('#steps').innerHTML=[1,2,3,4,5].map(n=>{const names={1:'Your world',2:'Connect the dots',3:'Rules of the game',4:'Test it',5:'Complete'};return `<div class="step ${n<v.stage?'done':n===v.stage?'now':''}">${n<v.stage?'✓ ':''}${n}. ${names[n]}</div>`}).join('');
-  $('#reveal').hidden=v.score<60;growLabel();
+  $('#reveal').hidden=v.score<60;growLabel();renderNext(v);
   renderChat(v);
   GR.sync();
   if(tab==='arena')renderArena();
@@ -378,6 +399,7 @@ function renderUses(){
   const st={ok:['✓','#1B8A5A'],draft:['unconfirmed draft','#0091DA'],stub:['not described yet','#C27A00'],missing:['not on the map yet','#C0392B']};
   p.innerHTML=`${S.usecases_stale?`<div class="gap" style="margin-bottom:12px"><span>The map changed since these were written.</span><button class="btn sm" id="ugo">Refresh</button></div>`:''}
     ${u.items.map((x,i)=>`<div class="q"><div><span class="st ${x.ready?'yes':'partial'}">${x.ready?'Ready':'Needs more on the map'}</span><b>${esc(x.title)}</b></div>
+      ${x.solves?`<div style="font-size:12px;margin-top:6px;color:var(--blue)">Solves: ${esc(x.solves)}</div>`:''}
       <div style="margin-top:6px">“${esc(x.question)}”</div>
       <div class="mute" style="font-size:13px;margin-top:8px"><b>Today:</b> ${esc(x.today)}</div>
       <div style="font-size:13px;margin-top:4px"><b>With the map:</b> ${esc(x.with_map)}</div>
@@ -391,8 +413,9 @@ function renderUses(){
 async function genUses(){const b=$('#ugo');b.disabled=true;b.textContent='Writing…';try{render(await api(`/session/${sid}/usecases`,'POST'))}catch(e){err(e);b.disabled=false;b.textContent='Show me use cases'}}
 
 /* ---------------- tabs ---------------- */
+const TABHELP={map:'The picture of your business: the kinds of things and how they connect. Dashed means a guess waiting for you to keep or remove.',arena:'Ask a real question. We show how the map would answer it, or what is still missing.',uses:'Everyday questions this map could answer, how they are answered today, and what the map still needs.',story:'A plain-words walkthrough of your map and why it is built this way. It describes the map, not example data.',hist:'Everything that changed so far, and a place to correct the map in your own words.'};
 function setTab(t){
-  tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  tab=t;$('#tabhelp').textContent=TABHELP[t]||'';document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   ['map','arena','uses','story','hist'].forEach(x=>$('#p-'+x).hidden=x!==t);
   if(t==='uses')renderUses();if(t==='arena')renderArena();if(t==='story')renderStory();if(t==='hist')renderHist();if(t==='map')GR.sync();
 }

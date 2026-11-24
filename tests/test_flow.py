@@ -205,3 +205,15 @@ def test_draft_flow():
 
 if __name__ == "__main__":
     test_draft_flow()
+
+
+def test_gap_wording():
+    import ontology as O
+    st = O.new_state("x")
+    O.apply_delta(st, {"classes": [{"name": "ProductBatch", "description": "d"}]}, "t")
+    q = {"question": "q", "concepts": [{"term": "last month", "kind": "detail", "of": "ProductBatch"}, {"term": "crude", "kind": "detail", "of": "ProductBatch"}], "relations_needed": []}
+    gaps = O.evaluate_question(st, q)["gaps"]
+    assert any("needs a date" in g["text"] for g in gaps) and any("type or status" in g["text"] for g in gaps), gaps
+    O.apply_delta(st, {"properties": [{"class": "ProductBatch", "name": "deliveryDate", "type": "date"}, {"class": "ProductBatch", "name": "productType", "type": "text"}]}, "t")
+    assert not [g for g in O.evaluate_question(st, q)["gaps"] if g["type"] == "missing_detail"]
+    print("gap wording ok")

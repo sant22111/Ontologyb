@@ -230,7 +230,7 @@ def respond(task, ctx):
         return {"usecases": [
             {"title": f"Trace {cl[0]} to {cl[-1]}", "question": f"Which {cl[-1]} is linked to a given {cl[0]}?",
              "today": "Usually answered by asking several teams and joining files by hand.", "with_map": "Follow the connections from one to the other.",
-             "value": "Faster, consistent answers.", "needs": cl[:3]},
+             "value": "Faster, consistent answers.", "solves": (ctx.get("goals") or [""])[0], "needs": cl[:3]},
             {"title": "Spot what is missing", "question": f"Which {cl[0]} has no {cl[1]} recorded?",
              "today": "Found by manual checks.", "with_map": "The gap shows up as a missing connection.", "value": "Fewer surprises.", "needs": cl[:2]},
             {"title": "Cover a thing the map lacks", "question": "Which deadline is coming up next?",

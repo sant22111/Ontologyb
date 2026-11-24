@@ -381,6 +381,28 @@ def confirm_or_remove(st, name, action, kind="class"):
     return True
 
 
+_TIME = re.compile(r"\b(last|this|next|previous|past|prior)\s+(day|week|month|quarter|year)\b|\b(today|yesterday|tomorrow|recent|recently|monthly|weekly|daily|yearly|quarterly|fy\d*|date|when|since|until|before|after|expir\w*|deadline|due)\b", re.I)
+_VALUE_WORDS = ("type", "kind", "status", "category", "grade", "class", "state", "stage", "reason", "name", "code")
+
+
+def detail_need(term):
+    return "date" if _TIME.search(str(term or "")) else "value"
+
+
+def detail_satisfied(st, cl, term, need):
+    for p in st["properties"]:
+        if p["class"] != cl:
+            continue
+        pn = norm(p["name"])
+        if pn and (pn in norm(term) or norm(term) in pn):
+            return True
+        if need == "date" and (p.get("type") == "date" or any(w in pn for w in ("date", "time", "period", "month", "year", "day"))):
+            return True
+        if need == "value" and any(w in pn for w in _VALUE_WORDS):
+            return True
+    return False
+
+
 def degree_map(st):
     deg = defaultdict(int)
     for r in st["relationships"]:
@@ -540,9 +562,14 @@ def evaluate_question(st, q):
                 continue
             nodes.add(cl)
             resolved.append(cl)
-            has = any(p["class"] == cl and (norm(p["name"]) in norm(term) or norm(term) in norm(p["name"])) for p in st["properties"])
-            if not has:
-                gaps.append({"type": "missing_detail", "of": cl, "name": camel(term), "text": f"'{cl}' has no detail called '{term}'"})
+            need = detail_need(term)
+            if not detail_satisfied(st, cl, term, need):
+                if need == "date":
+                    gaps.append({"type": "missing_detail", "of": cl, "name": "date", "need": need, "term": term,
+                                 "text": f"To answer \"{term}\", '{cl}' needs a date (for example when it happened or was recorded)."})
+                else:
+                    gaps.append({"type": "missing_detail", "of": cl, "name": camel(term) + "Type", "need": need, "term": term,
+                                 "text": f"To tell \"{term}\" apart, '{cl}' needs a type or status detail."})
         else:
             cl = find_class(st, c.get("maps_to") or "") or find_class(st, term)
             if not cl:

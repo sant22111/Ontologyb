@@ -49,7 +49,7 @@ MAP:
 {context_block}
 
 Reply with ONLY JSON:
-{{"usecases":[{{"title":"short, in business terms","question":"the exact question someone in the business would ask, in their words","today":"honest one sentence on how it is usually answered today (teams, files, time)","with_map":"one sentence on how it is answered by following the map","value":"one sentence on why it matters","needs":["ExistingOrNeededClassName"]}}]}}
+{{"usecases":[{{"title":"short, in business terms","question":"the exact question someone in the business would ask, in their words","today":"honest one sentence on how it is usually answered today (teams, files, time)","with_map":"one sentence on how it is answered by following the map","value":"one sentence on why it matters","solves":"copy ONE of the client's stated problems word for word, or empty if none fits","needs":["ExistingOrNeededClassName"]}}]}}
 Rules: give 4 or 5 use cases, tied to what the client wants to fix when stated. "needs" lists the things from the map the answer relies on, using the exact class names; include a thing the map does not have yet if the use case really needs it. Do not invent figures or time savings."""
 
 

@@ -415,7 +415,8 @@ def arena_fix(sid: str, qid: str, body: Fix):
         elif gap["type"] == "missing_connection":
             rule = f"Question: {q['question']}\nGap: {gap['text']}. Add the most sensible connection (or short chain via an existing thing) between {gap['from']} and {gap['to']}."
         else:
-            rule = f"Question: {q['question']}\nGap: {gap['text']}. Add the detail '{gap['name']}' to {gap['of']}."
+            rule = (f"Question: {q['question']}\nGap: {gap['text']} Add ONE detail to {gap['of']} so the question can be answered. Suggest the name '{gap['name']}' but choose a clearer, specific name if one fits (for example deliveryDate, productType, disputeStatus); keep a word like Date, Type or Status in it. "
+                    f"Do not create a detail whose name is just the words of the question.")
         ctx = {"gap": gap, "term": gap.get("term", ""), "classes": list(st["classes"].keys())}
         res = ai("fix", P.fix_system(ont.context_block(st), rule), [{"role": "user", "content": "Fix this gap."}], ctx)
         result = ont.apply_delta(st, res.get("delta"), "Question Arena")
@@ -459,7 +460,7 @@ def usecases(sid: str):
         st = load(sid)
         if len(st["classes"]) < 3:
             raise HTTPException(400, "Add a few more things before asking for use cases")
-        ctx = {"classes": list(st["classes"].keys())}
+        ctx = {"classes": list(st["classes"].keys()), "goals": st.get("goals") or []}
         res = ai("usecases", P.usecases_system(ont.context_block(st), st.get("goals"), st.get("client", ""), ont.trail_block(st)),
                  [{"role": "user", "content": "Write the use cases."}], ctx, max_tokens=3000)
         items = []
@@ -470,6 +471,7 @@ def usecases(sid: str):
                 "title": str(u.get("title", ""))[:120], "question": str(u["question"])[:300],
                 "today": str(u.get("today", ""))[:300], "with_map": str(u.get("with_map", ""))[:300], "value": str(u.get("value", ""))[:300],
                 "needs": [str(n)[:60] for n in (u.get("needs") or []) if isinstance(n, str)][:6],
+                "solves": next((g for g in (st.get("goals") or []) if ont.norm(g) == ont.norm(u.get("solves", ""))), ""),
             })
         if not items:
             raise HTTPException(502, "The AI did not return any use cases. Try again.")
