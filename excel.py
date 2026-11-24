@@ -47,7 +47,7 @@ def build_workbook(st) -> bytes:
     ws.column_dimensions["B"].width = 90
     ws["A1"] = f"Business map: {st['domain']}"
     ws["A1"].font = Font(bold=True, size=18, color=BLUE)
-    ws["A2"] = f"Built in a guided workshop · {st['updated'][:10]} · map strength {s['score']}/100"
+    ws["A2"] = f"{('Client: ' + st['client'] + ' · ') if st.get('client') else ''}Built in a guided workshop · {st['updated'][:10]} · map strength {s['score']}/100"
     ws["A2"].font = Font(italic=True, color="666666")
     rows = [
         ("Things (classes)", len(st["classes"])), ("Connections (relationships)", len(st["relationships"])),

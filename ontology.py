@@ -71,11 +71,13 @@ def snake_upper(s):
     return s.upper()
 
 
-def new_state(domain, template=None, owner=""):
+def new_state(domain, template=None, owner="", client="", about=""):
     st = {
         "id": uuid.uuid4().hex[:10],
         "domain": domain.strip() or "My business area",
         "owner": owner.strip(),
+        "client": client.strip()[:80],
+        "about": about.strip()[:1200],
         "created": now(),
         "updated": now(),
         "template": template if template in TEMPLATES else None,
@@ -522,7 +524,7 @@ def node_detail(st, name):
 def view(st, include_messages=True):
     s = summary(st)
     v = {
-        "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "created": st["created"], "updated": st["updated"],
+        "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "client": st.get("client", ""), "about": st.get("about", ""), "created": st["created"], "updated": st["updated"],
         "template": st["template"], "classes": list(st["classes"].values()), "relationships": st["relationships"],
         "properties": st["properties"], "rules": st["rules"], "questions": st["questions"], "story": st["story"],
         "sample": st["sample"], "changelog": st["changelog"][-60:], **s,

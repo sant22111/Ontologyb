@@ -126,7 +126,7 @@ def interview_turn(st, user_text):
         turn += 1
     s = ont.summary(st)
     tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else "No template; start from the client's own words."
-    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]))
+    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""))
     ctx = {"turn": turn, "classes": list(st["classes"].keys())}
     try:
         res = ai("interview", system, llm_history(st), ctx)
@@ -144,6 +144,8 @@ class NewSession(BaseModel):
     domain: str
     template: str | None = None
     owner: str = ""
+    client: str = ""
+    about: str = ""
 
 
 class Msg(BaseModel):
@@ -192,7 +194,7 @@ def sessions():
 def create(body: NewSession):
     if not body.domain.strip():
         raise HTTPException(400, "Tell us what area to map")
-    st = ont.new_state(body.domain, body.template, body.owner)
+    st = ont.new_state(body.domain, body.template, body.owner, body.client, body.about)
     with _lock(st["id"]):
         interview_turn(st, None)
         save(st)

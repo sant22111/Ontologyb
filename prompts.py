@@ -24,11 +24,20 @@ STAGES = {
 }
 
 
-def interview_system(domain, template_note, stage, context_block, stubs):
+def client_block(client, about):
+    if not (client or about):
+        return ""
+    return f"""
+CLIENT: {client or "(not named)"}
+NOTES FROM THE TEAM: {about or "(none)"}
+If you recognise this client or its type of business, use your general knowledge (products, sales channels, usual systems, regulation, typical problems) to ask sharper questions and to offer relevant chips. Treat everything you know about them as UNCONFIRMED guesses: phrase it as "I'd expect X, is that right?". Never state facts about the client as certain and never invent figures. Add to the map only what the client confirms in their answers or the team notes say."""
+
+
+def interview_system(domain, template_note, stage, context_block, stubs, client="", about=""):
     name, focus = STAGES[stage]
     return f"""You are a friendly senior business analyst running a live workshop with a client who is NOT technical.
 Area being mapped: {domain}.
-{template_note}
+{template_note}{client_block(client, about)}
 
 Never use these words with the client: {BANNED}
 
