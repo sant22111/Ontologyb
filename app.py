@@ -454,6 +454,63 @@ def doc_guide(sid: str):
     return present(st)
 
 
+def _clean_uc(u, st, custom=False):
+    if not isinstance(u, dict) or not u.get("question"):
+        return None
+    return {
+        "title": str(u.get("title", ""))[:120], "question": str(u["question"])[:300],
+        "today": str(u.get("today", ""))[:300], "with_map": str(u.get("with_map", ""))[:300], "value": str(u.get("value", ""))[:300],
+        "needs": [str(n)[:60] for n in (u.get("needs") or []) if isinstance(n, str)][:6],
+        "solves": next((g for g in (st.get("goals") or []) if ont.norm(g) == ont.norm(u.get("solves", ""))), ""),
+        "custom": custom,
+    }
+
+
+class OwnUC(BaseModel):
+    question: str
+
+
+@app.post("/api/session/{sid}/usecases/add")
+def usecase_add(sid: str, body: OwnUC):
+    qtext = body.question.strip()[:300]
+    if len(qtext) < 8:
+        raise HTTPException(400, "Write the question in a full sentence")
+    with _lock(sid):
+        st = load(sid)
+        if not st["classes"]:
+            raise HTTPException(400, "Build a few things on the map first")
+        res = ai("usecase_one", P.usecase_one_system(ont.context_block(st), st.get("goals"), st.get("client", ""), ont.trail_block(st), qtext),
+                 [{"role": "user", "content": "Write the use case."}], {"classes": list(st["classes"].keys()), "question": qtext}, max_tokens=1500)
+        res["question"] = res.get("question") or qtext
+        c = _clean_uc(res, st, custom=True)
+        if not c:
+            raise HTTPException(502, "The AI did not return a use case. Try again.")
+        uc = st.get("usecases") or {"items": [], "sig": sig(st)}
+        uc["items"] = (uc["items"] + [c])[-12:]
+        st["usecases"] = uc
+        ont.log(st, "use case", "Client added their own use case")
+        save(st)
+    return present(st)
+
+
+class RemoveUC(BaseModel):
+    index: int
+
+
+@app.post("/api/session/{sid}/usecases/remove")
+def usecase_remove(sid: str, body: RemoveUC):
+    with _lock(sid):
+        st = load(sid)
+        items = (st.get("usecases") or {}).get("items") or []
+        if not (0 <= body.index < len(items)):
+            raise HTTPException(404, "No such use case")
+        items.pop(body.index)
+        if not items:
+            st["usecases"] = None
+        save(st)
+    return present(st)
+
+
 @app.post("/api/session/{sid}/usecases")
 def usecases(sid: str):
     with _lock(sid):
@@ -463,16 +520,11 @@ def usecases(sid: str):
         ctx = {"classes": list(st["classes"].keys()), "goals": st.get("goals") or []}
         res = ai("usecases", P.usecases_system(ont.context_block(st), st.get("goals"), st.get("client", ""), ont.trail_block(st)),
                  [{"role": "user", "content": "Write the use cases."}], ctx, max_tokens=3000)
-        items = []
+        items = [i for i in ((st.get("usecases") or {}).get("items") or []) if i.get("custom")]
         for u in (res.get("usecases") or [])[:5]:
-            if not isinstance(u, dict) or not u.get("question"):
-                continue
-            items.append({
-                "title": str(u.get("title", ""))[:120], "question": str(u["question"])[:300],
-                "today": str(u.get("today", ""))[:300], "with_map": str(u.get("with_map", ""))[:300], "value": str(u.get("value", ""))[:300],
-                "needs": [str(n)[:60] for n in (u.get("needs") or []) if isinstance(n, str)][:6],
-                "solves": next((g for g in (st.get("goals") or []) if ont.norm(g) == ont.norm(u.get("solves", ""))), ""),
-            })
+            c = _clean_uc(u, st)
+            if c:
+                items.append(c)
         if not items:
             raise HTTPException(502, "The AI did not return any use cases. Try again.")
         st["usecases"] = {"items": items, "sig": sig(st)}

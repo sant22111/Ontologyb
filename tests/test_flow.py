@@ -196,6 +196,15 @@ def test_draft_flow():
     items = v["usecases"]["items"]
     assert len(items) >= 3 and all("check" in i for i in items)
     assert any(not i["ready"] for i in items) and any(i["ready"] for i in items), [i["ready"] for i in items]
+    v = c.post(f"/api/session/{sid}/usecases/add", json={"question": "Which shops were billed at the wrong price this month?"}).json()
+    own = [i for i in v["usecases"]["items"] if i.get("custom")]
+    assert len(own) == 1 and "wrong price" in own[0]["question"] and "check" in own[0]
+    v = c.post(f"/api/session/{sid}/usecases").json()  # regenerate keeps the client's own
+    assert any(i.get("custom") for i in v["usecases"]["items"]) and len(v["usecases"]["items"]) >= 4
+    assert c.post(f"/api/session/{sid}/usecases/add", json={"question": "short"}).status_code == 400
+    n = len(v["usecases"]["items"])
+    v = c.post(f"/api/session/{sid}/usecases/remove", json={"index": 0}).json()
+    assert len(v["usecases"]["items"]) == n - 1
     v2 = c.post("/api/session", json={"domain": "Sales", "client": "Acme", "goals": ["Audits take weeks", "x" * 500, "c", "d"]}).json()
     assert len(v2["goals"]) == 3 and len(v2["goals"][1]) == 200
     v2 = c.post("/api/session", json={"domain": "Sales", "client": "Acme"}).json()

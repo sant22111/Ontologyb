@@ -106,6 +106,21 @@ DOCUMENT TEXT (between the markers):
 <<<END>>>"""
 
 
+def usecase_one_system(context_block, goals, client, trail, question):
+    g = "; ".join(goals) if goals else "(not stated)"
+    return f"""The client has written their own use case as a question. Turn it into one use case card for a business map. Plain business language. Never use these words: {BANNED}
+Client: {client or "(not named)"}. Their stated problems: {g}
+{trail}
+MAP:
+{context_block}
+
+THE CLIENT'S QUESTION: {question}
+
+Keep the client's own wording for the question (fix only typos). Reply with ONLY JSON:
+{{"title":"short, in business terms","question":"the client's question","today":"honest one sentence on how it is usually answered today","with_map":"one sentence on how it is answered by following the map","value":"one sentence on why it matters","solves":"copy ONE of the client's stated problems word for word, or empty if none fits","needs":["ClassName"]}}
+"needs" lists the things from the map the answer relies on, using exact class names; include a thing the map lacks if the question really needs it. Do not invent figures."""
+
+
 def docguide_system(context_block, client, about, goals, trail, have):
     return f"""You are advising a client on WHICH documents and spreadsheets to share so their business map can be completed. Be specific to THIS client, using everything learned so far. Plain business language. Never use these words: {BANNED}
 Client: {client or "(not named)"}. Team notes: {about or "(none)"}.{goals_block(goals)}

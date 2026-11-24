@@ -135,6 +135,10 @@ def respond(task, ctx):
     if task == "draft":
         import copy
         return copy.deepcopy(DRAFT)
+    if task == "usecase_one":
+        cl = (classes + ["Thing A", "Thing B"])[:2]
+        return {"title": "Your own question", "question": ctx.get("question", ""), "today": "Usually answered by asking several people.",
+                "with_map": "Follow the connections on the map.", "value": "A consistent answer.", "solves": "", "needs": cl}
     if task == "docguide":
         return {"intro": "Share the documents that show how orders, schemes and distributors are handled day to day.",
                 "documents": [

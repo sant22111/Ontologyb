@@ -259,7 +259,15 @@ $('#begin').onclick=async()=>{
 $('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
 function syncGoalsBox(){const r=$('#research').checked&&!!$('#client').value.trim();$('#goalsbox').hidden=r;$('#goalsnote').hidden=!r}
 $('#research').onchange=syncGoalsBox;$('#client').addEventListener('input',syncGoalsBox);syncGoalsBox();
-function goalList(el,items){el.innerHTML=items.map(g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`).join('');el.onchange=()=>{const on=el.querySelectorAll('input:checked').length;el.querySelectorAll('input:not(:checked)').forEach(i=>i.disabled=on>=3)}}
+function goalList(el,items){
+  const row=g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`;
+  el.innerHTML=items.map(row).join('')+`<div class="growrow" style="margin-top:10px"><input type="text" class="ownp" placeholder="Or write your own problem or use case…" maxlength="200"><button type="button" class="btn ghost sm ownb">Add</button></div>`;
+  const sync=()=>{const on=el.querySelectorAll('input[type=checkbox]:checked').length;el.querySelectorAll('input[type=checkbox]:not(:checked)').forEach(i=>i.disabled=on>=3)};
+  el.onchange=sync;
+  el.querySelector('.ownb').onclick=()=>{const inp=el.querySelector('.ownp'),t=inp.value.trim();if(t.length<8)return toast('Write it as a full sentence');
+    if(el.querySelectorAll('input[type=checkbox]:checked').length>=3)return toast('Untick one first. You can pick up to 3.');
+    el.querySelector('.growrow').insertAdjacentHTML('beforebegin',row(t));const cb=[...el.querySelectorAll('input[type=checkbox]')].pop();cb.checked=true;inp.value='';sync()};
+}
 function showPick(v){
   sid=v.id;$('#landing').hidden=true;$('#app').hidden=true;$('#pick').hidden=false;
   const d=v.draft||{};
@@ -392,10 +400,12 @@ $('#grow').onclick=()=>{if(!S)return;if(S.counts.drafts&&!$('#drawer').hidden)re
 /* ---------------- goals + use cases ---------------- */
 const GOALS=["I can't quickly trace something from start to finish (a product, a payment, a case)","Different teams give different answers to the same question","Audits and reporting take weeks of pulling data from different places","Deadlines, renewals or expiries sneak up on us","When something goes wrong, we can't quickly see who or what is affected","New joiners take months to learn how things connect","We want AI to answer questions about our business, but it gets things wrong"];
 goalList($('#goals'),GOALS);
+function ownUcBox(){return `<div class="sect" style="margin-top:14px"><h4 style="font-size:15px">Add your own use case</h4><div class="mute" style="font-size:13px">Write a question your team wishes it could answer. We turn it into a card and check it against your map.</div><textarea id="ownuc" rows="2" maxlength="300" placeholder="e.g. Which gas customers were billed at the wrong price this month?" style="margin-top:6px"></textarea><button class="btn sm" id="ownucgo" style="margin-top:6px">Add use case</button></div>`}
+function bindOwnUc(){const b=$('#ownucgo');if(!b)return;b.onclick=async()=>{const t=$('#ownuc').value.trim();if(t.length<8)return toast('Write it as a full sentence');b.disabled=true;b.textContent='Adding…';try{render(await api(`/session/${sid}/usecases/add`,'POST',{question:t}))}catch(e){err(e);b.disabled=false;b.textContent='Add use case'}}}
 function renderUses(){
   const p=$('#p-uses');const u=S.usecases;
-  if(!u){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">What you can do with this map</h4><div class="mute">Real questions your team could answer in seconds, how they are answered today, and what the map still needs for each.${S.goals&&S.goals.length?`<div style="margin-top:8px">Built around what you want to fix: <b>${S.goals.map(esc).join('; ')}</b></div>`:''}</div><button class="btn" id="ugo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Show me use cases</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}`;
-    const b=$('#ugo');if(b)b.onclick=genUses;return}
+  if(!u){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">What you can do with this map</h4><div class="mute">Real questions your team could answer in seconds, how they are answered today, and what the map still needs for each.${S.goals&&S.goals.length?`<div style="margin-top:8px">Built around what you want to fix: <b>${S.goals.map(esc).join('; ')}</b></div>`:''}</div><button class="btn" id="ugo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Show me use cases</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}${S.counts.things>=1?ownUcBox():''}`;
+    const b=$('#ugo');if(b)b.onclick=genUses;bindOwnUc();return}
   const st={ok:['✓','#1B8A5A'],draft:['unconfirmed draft','#0091DA'],stub:['not described yet','#C27A00'],missing:['not on the map yet','#C0392B']};
   p.innerHTML=`${S.usecases_stale?`<div class="gap" style="margin-bottom:12px"><span>The map changed since these were written.</span><button class="btn sm" id="ugo">Refresh</button></div>`:''}
     ${u.items.map((x,i)=>`<div class="q"><div><span class="st ${x.ready?'yes':'partial'}">${x.ready?'Ready':'Needs more on the map'}</span><b>${esc(x.title)}</b></div>
@@ -405,9 +415,11 @@ function renderUses(){
       <div style="font-size:13px;margin-top:4px"><b>With the map:</b> ${esc(x.with_map)}</div>
       ${x.value?`<div class="mute" style="font-size:13px;margin-top:4px"><b>Why it matters:</b> ${esc(x.value)}</div>`:''}
       <div style="font-size:12px;margin-top:8px">Relies on: ${x.check.map(c=>`<span style="color:${st[c.state][1]}">${esc(c.name)}${c.state==='ok'?' ✓':' ('+st[c.state][0]+')'}</span>`).join(' · ')||'<span class="mute">nothing specific</span>'}</div>
-      <div style="margin-top:8px"><button class="btn sm try" data-i="${i}">Try it on my map</button></div></div>`).join('')}
-    ${S.usecases_stale?'':'<div style="margin-top:8px"><button class="btn ghost sm" id="ugo">Write new ones</button></div>'}`;
-  const g=$('#ugo');if(g)g.onclick=genUses;
+      <div style="margin-top:8px"><button class="btn sm try" data-i="${i}">Try it on my map</button> ${x.custom?'<span class="mute" style="font-size:12px">your own</span> ':''}<button class="btn ghost sm rmuc" data-i="${i}">Remove</button></div></div>`).join('')}
+    ${S.usecases_stale?'':'<div style="margin-top:8px"><button class="btn ghost sm" id="ugo">Write new ones</button></div>'}
+    ${ownUcBox()}`;
+  const g=$('#ugo');if(g)g.onclick=genUses;bindOwnUc();
+  p.querySelectorAll('.rmuc').forEach(b=>b.onclick=async()=>{b.disabled=true;try{render(await api(`/session/${sid}/usecases/remove`,'POST',{index:+b.dataset.i}))}catch(e){err(e);b.disabled=false}});
   p.querySelectorAll('.try').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Checking…';try{const v=await api(`/session/${sid}/arena`,'POST',{question:u.items[+b.dataset.i].question});render(v);setTab('arena');toast(v.question.status==='yes'?'✓ Your map can answer that':'Found '+v.question.gaps.length+' gap(s). Add them to the map.')}catch(e){err(e);b.disabled=false;b.textContent='Try it on my map'}});
 }
 async function genUses(){const b=$('#ugo');b.disabled=true;b.textContent='Writing…';try{render(await api(`/session/${sid}/usecases`,'POST'))}catch(e){err(e);b.disabled=false;b.textContent='Show me use cases'}}
