@@ -485,7 +485,7 @@ def story(sid: str):
         st = load(sid)
         if len(st["classes"]) < 3:
             raise HTTPException(400, "Add a few more things before asking for the story")
-        res = ai("story", P.story_system(ont.context_block(st)), [{"role": "user", "content": "Explain the map."}], {"domain": st["domain"], "classes": list(st["classes"].keys())}, max_tokens=3500)
+        res = ai("story", P.story_system(ont.context_block(st), ont.trail_block(st), st.get("goals")), [{"role": "user", "content": "Explain the map."}], {"domain": st["domain"], "classes": list(st["classes"].keys())}, max_tokens=3500)
         res["sig"] = sig(st)
         st["story"] = res
         ont.log(st, "story", "Generated plain-language explanation")

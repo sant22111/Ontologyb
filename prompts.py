@@ -191,8 +191,10 @@ Reply with ONLY JSON: {{"reply":"plain explanation of what changed or why nothin
 {DELTA_SPEC}"""
 
 
-def story_system(context_block):
-    return f"""Explain this business map to a smart non-technical executive who has never heard of an ontology. Plain, warm, concrete. No jargon (never say: {BANNED}). Use their own examples.
+def story_system(context_block, trail="", goals=None):
+    return f"""Explain this business map to a smart non-technical executive who has never heard of an ontology. Plain, warm, concrete. No jargon (never say: {BANNED}). Use their own examples.{goals_block(goals)}
+{trail}
+Use the background above to make the explanation specific to this client (their products, partners, rules, the documents they shared), and tie "unlocks" to the problems they said they want to fix. Items marked [DRAFT] on the map are not yet confirmed: say so in watch_outs instead of presenting them as settled. Background that is not on the map must not be presented as part of the map.
 MAP:
 {context_block}
 Reply with ONLY JSON:
