@@ -202,6 +202,17 @@ def respond(task, ctx):
                 edges.append({"from": a[0], "to": b[0], "rel": r["name"]})
                 edges.append({"from": a[-1], "to": b[-1], "rel": r["name"]})
         return {"nodes": nodes, "edges": edges}
+    if task == "usecases":
+        cl = (classes + ["Thing A", "Thing B", "Thing C"])[:4]
+        return {"usecases": [
+            {"title": f"Trace {cl[0]} to {cl[-1]}", "question": f"Which {cl[-1]} is linked to a given {cl[0]}?",
+             "today": "Usually answered by asking several teams and joining files by hand.", "with_map": "Follow the connections from one to the other.",
+             "value": "Faster, consistent answers.", "needs": cl[:3]},
+            {"title": "Spot what is missing", "question": f"Which {cl[0]} has no {cl[1]} recorded?",
+             "today": "Found by manual checks.", "with_map": "The gap shows up as a missing connection.", "value": "Fewer surprises.", "needs": cl[:2]},
+            {"title": "Cover a thing the map lacks", "question": "Which deadline is coming up next?",
+             "today": "Tracked in separate calendars.", "with_map": "Deadlines hang off the things they apply to.", "value": "No missed dates.", "needs": [cl[0], "Deadline"]},
+        ]}
     if task == "suggest":
         return {"questions": [
             "Which customers share a device with an account that raised an alert?",

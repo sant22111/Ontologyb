@@ -100,6 +100,7 @@ def sig(st):
 def present(st, include_messages=True):
     v = ont.view(st, include_messages)
     v["story_stale"] = bool(st["story"]) and st["story"].get("sig") != sig(st)
+    v["usecases_stale"] = bool(st.get("usecases")) and st["usecases"].get("sig") != sig(st)
     v["sample_stale"] = bool(st["sample"]) and st["sample"].get("sig") != sig(st)
     v["llm"] = {"provider": llm.provider, "model": llm.model}
     return v
@@ -124,7 +125,7 @@ def build_draft(st):
     tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else ""
     user = f"Client: {st['client']}\nArea: {st['domain']}\nTeam notes: {st['about'] or '(none)'}"
     try:
-        obj, urls = llm.research(P.draft_system(st["client"], st["about"], st["domain"], tnote), user, {})
+        obj, urls = llm.research(P.draft_system(st["client"], st["about"], st["domain"], tnote, st.get("goals")), user, {})
         delta = obj.get("delta") if isinstance(obj, dict) and isinstance(obj.get("delta"), dict) else {}
         for k in ("rules", "remove", "rename", "confirm"):
             delta.pop(k, None)
@@ -145,7 +146,7 @@ def interview_turn(st, user_text):
     s = ont.summary(st)
     drafts = [k for k, c in st["classes"].items() if c.get("draft")]
     tnote = ont.TEMPLATES[st["template"]]["note"] if st["template"] else "No template; start from the client's own words."
-    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""), drafts)
+    system = P.interview_system(st["domain"], tnote, s["stage"], ont.context_block(st), ", ".join(s["stubs"]), st.get("client", ""), st.get("about", ""), drafts, st.get("goals"))
     ctx = {"turn": turn, "classes": list(st["classes"].keys()), "drafts": bool(drafts)}
     try:
         res = ai("interview", system, llm_history(st), ctx)
@@ -166,6 +167,7 @@ class NewSession(BaseModel):
     client: str = ""
     about: str = ""
     research: bool = False
+    goals: list[str] = []
 
 
 class Msg(BaseModel):
@@ -214,7 +216,7 @@ def sessions():
 def create(body: NewSession):
     if not body.domain.strip():
         raise HTTPException(400, "Tell us what area to map")
-    st = ont.new_state(body.domain, body.template, body.owner, body.client, body.about)
+    st = ont.new_state(body.domain, body.template, body.owner, body.client, body.about, body.goals)
     with _lock(st["id"]):
         if body.research and st["client"]:
             build_draft(st)
@@ -324,6 +326,32 @@ def arena_fix(sid: str, qid: str, body: Fix):
     v = present(st)
     v["fix_reply"] = res.get("reply", "")
     return v
+
+
+@app.post("/api/session/{sid}/usecases")
+def usecases(sid: str):
+    with _lock(sid):
+        st = load(sid)
+        if len(st["classes"]) < 3:
+            raise HTTPException(400, "Add a few more things before asking for use cases")
+        ctx = {"classes": list(st["classes"].keys())}
+        res = ai("usecases", P.usecases_system(ont.context_block(st), st.get("goals"), st.get("client", "")),
+                 [{"role": "user", "content": "Write the use cases."}], ctx, max_tokens=3000)
+        items = []
+        for u in (res.get("usecases") or [])[:5]:
+            if not isinstance(u, dict) or not u.get("question"):
+                continue
+            items.append({
+                "title": str(u.get("title", ""))[:120], "question": str(u["question"])[:300],
+                "today": str(u.get("today", ""))[:300], "with_map": str(u.get("with_map", ""))[:300], "value": str(u.get("value", ""))[:300],
+                "needs": [str(n)[:60] for n in (u.get("needs") or []) if isinstance(n, str)][:6],
+            })
+        if not items:
+            raise HTTPException(502, "The AI did not return any use cases. Try again.")
+        st["usecases"] = {"items": items, "sig": sig(st)}
+        ont.log(st, "use cases", f"Wrote {len(items)} use cases")
+        save(st)
+    return present(st)
 
 
 @app.post("/api/session/{sid}/story")

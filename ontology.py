@@ -71,7 +71,7 @@ def snake_upper(s):
     return s.upper()
 
 
-def new_state(domain, template=None, owner="", client="", about=""):
+def new_state(domain, template=None, owner="", client="", about="", goals=None):
     st = {
         "id": uuid.uuid4().hex[:10],
         "domain": domain.strip() or "My business area",
@@ -88,6 +88,8 @@ def new_state(domain, template=None, owner="", client="", about=""):
         "rules": [],
         "questions": [],
         "draft": None,
+        "goals": [str(g).strip()[:200] for g in (goals or []) if str(g).strip()][:3],
+        "usecases": None,
         "story": None,
         "sample": None,
         "changelog": [],
@@ -579,15 +581,32 @@ def node_detail(st, name):
     return {"class": c, "outgoing": out, "incoming": inc, "properties": props, "rules": rules, "questions": qs}
 
 
+def usecases_view(st):
+    """Readiness is computed from the live map, never taken from the AI."""
+    uc = st.get("usecases")
+    if not uc:
+        return None
+    items = []
+    for it in uc.get("items", []):
+        check = []
+        for n in it.get("needs", []):
+            k = find_class(st, n)
+            state = "missing" if not k else ("draft" if st["classes"][k].get("draft") else "stub" if st["classes"][k].get("stub") else "ok")
+            check.append({"name": k or n, "state": state})
+        items.append({**it, "check": check, "ready": bool(check) and all(c["state"] == "ok" for c in check)})
+    return {"items": items, "sig": uc.get("sig")}
+
+
 def view(st, include_messages=True):
     s = summary(st)
     v = {
         "id": st["id"], "domain": st["domain"], "owner": st.get("owner", ""), "client": st.get("client", ""), "about": st.get("about", ""), "created": st["created"], "updated": st["updated"],
         "template": st["template"], "classes": list(st["classes"].values()), "relationships": st["relationships"],
         "properties": st["properties"], "rules": st["rules"], "questions": st["questions"], "story": st["story"],
-        "sample": st["sample"], "draft": st.get("draft"), "changelog": st["changelog"][-60:], **s,
+        "sample": st["sample"], "draft": st.get("draft"), "goals": st.get("goals", []), "usecases": usecases_view(st), "changelog": st["changelog"][-60:], **s,
         "counts": {"things": len(st["classes"]), "connections": len(st["relationships"]), "details": len(st["properties"]),
-                   "rules": len(st["rules"]), "questions": len(st["questions"])},
+                   "rules": len(st["rules"]), "questions": len(st["questions"]),
+                   "drafts": sum(1 for c in st["classes"].values() if c.get("draft"))},
     }
     if include_messages:
         v["messages"] = st["messages"]

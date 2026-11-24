@@ -66,8 +66,8 @@ main{flex:1;display:grid;grid-template-columns:minmax(340px,38%) 1fr;gap:12px;pa
 .dots span{display:inline-block;width:6px;height:6px;border-radius:50%;background:#9aa5bd;margin:0 2px;animation:b 1s infinite}
 .dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
 @keyframes b{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
-.tabs{display:flex;border-bottom:1px solid var(--line);padding:0 8px;gap:2px;align-items:center}
-.tab{padding:11px 14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);font-weight:600}
+.tabs{overflow-x:auto;display:flex;border-bottom:1px solid var(--line);padding:0 8px;gap:2px;align-items:center}
+.tab{white-space:nowrap;padding:11px 12px;background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);font-weight:600}
 .tab.on{color:var(--blue);border-bottom-color:var(--blue)}
 .tabs .sp{flex:1}
 .pane{flex:1;min-height:0;overflow:auto;position:relative}
@@ -139,6 +139,8 @@ ul.tight{margin:4px 0 0;padding-left:18px}
     <label for="domain">What area are we mapping?</label>
     <input id="domain" placeholder="e.g. Retail banking fraud, GST litigation, Telecom compliance" maxlength="120">
     <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-weight:500"><input type="checkbox" id="research" checked style="width:auto;margin-top:3px"><span>Prepare a starting draft from public information about this client<span class="mute" style="display:block;font-weight:400;font-size:12px">Takes up to a minute. The AI reads public web pages and pre-fills a base map. Everything starts as a dashed guess, and the client confirms or corrects it. Needs a client name.</span></span></label>
+    <label>What would you most like to fix? <span class="mute" style="font-weight:400">(pick up to 3)</span></label>
+    <div id="goals" style="margin-top:4px"></div>
     <label for="about">Anything we should know? <span class="mute" style="font-weight:400">(optional)</span></label>
     <textarea id="about" rows="2" maxlength="1200" placeholder="e.g. sells through 40 distributors, uses SAP and a DMS, trade spend is a worry"></textarea>
     <label for="owner">Your name or team <span class="mute" style="font-weight:400">(optional)</span></label>
@@ -177,6 +179,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
       <div class="tabs">
         <button class="tab on" data-t="map">Your map</button>
         <button class="tab" data-t="arena">Test it</button>
+        <button class="tab" data-t="uses">Use cases</button>
         <button class="tab" data-t="story">Explain it</button>
         <button class="tab" data-t="hist">Changes</button>
         <span class="sp"></span><span class="mute" id="counts" style="font-size:12px;padding-right:8px"></span>
@@ -195,6 +198,7 @@ ul.tight{margin:4px 0 0;padding-left:18px}
         </div>
       </div>
       <div class="pane pad" id="p-arena" hidden></div>
+      <div class="pane pad" id="p-uses" hidden></div>
       <div class="pane pad" id="p-story" hidden></div>
       <div class="pane pad" id="p-hist" hidden></div>
     </section>
@@ -231,7 +235,7 @@ async function initLanding(){
 $('#begin').onclick=async()=>{
   const domain=$('#domain').value.trim(); if(!domain){$('#domain').focus();return}
   $('#begin').disabled=true;$('#begin').textContent=($('#research').checked&&$('#client').value.trim())?'Researching the client… up to a minute':'Starting…';
-  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,research:$('#research').checked&&!!$('#client').value.trim(),template:$('#tpl').value||null});enter(v)}
+  try{const v=await api('/session','POST',{domain,owner:$('#owner').value,client:$('#client').value,about:$('#about').value,research:$('#research').checked&&!!$('#client').value.trim(),goals:[...document.querySelectorAll('#goals input:checked')].map(i=>i.value),template:$('#tpl').value||null});enter(v)}
   catch(e){err(e)} finally{$('#begin').disabled=false;$('#begin').textContent='Begin'}
 };
 $('#domain').addEventListener('keydown',e=>{if(e.key==='Enter')$('#begin').click()});
@@ -257,6 +261,7 @@ function render(v,first){
   renderChat(v);
   GR.sync();
   if(tab==='arena')renderArena();
+  if(tab==='uses')renderUses();
   if(tab==='story')renderStory();
   if(tab==='hist')renderHist();
   if(first){GR.fit()}
@@ -305,11 +310,34 @@ function showView(v){
 $('#navchat').onclick=()=>showView('chat');$('#navmap').onclick=()=>showView('map');
 $('#bbtn').onclick=e=>{e.stopPropagation();$('#badges').classList.toggle('open')};
 
+/* ---------------- goals + use cases ---------------- */
+const GOALS=["I can't quickly trace something from start to finish (a product, a payment, a case)","Different teams give different answers to the same question","Audits and reporting take weeks of pulling data from different places","Deadlines, renewals or expiries sneak up on us","When something goes wrong, we can't quickly see who or what is affected","New joiners take months to learn how things connect","We want AI to answer questions about our business, but it gets things wrong"];
+$('#goals').innerHTML=GOALS.map(g=>`<label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:6px 0"><input type="checkbox" value="${esc(g)}" style="width:auto;margin-top:3px"><span>${esc(g)}</span></label>`).join('');
+$('#goals').addEventListener('change',()=>{const on=document.querySelectorAll('#goals input:checked').length;document.querySelectorAll('#goals input:not(:checked)').forEach(i=>i.disabled=on>=3)});
+function renderUses(){
+  const p=$('#p-uses');const u=S.usecases;
+  if(!u){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">What you can do with this map</h4><div class="mute">Real questions your team could answer in seconds, how they are answered today, and what the map still needs for each.${S.goals&&S.goals.length?`<div style="margin-top:8px">Built around what you want to fix: <b>${S.goals.map(esc).join('; ')}</b></div>`:''}</div><button class="btn" id="ugo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Show me use cases</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}`;
+    const b=$('#ugo');if(b)b.onclick=genUses;return}
+  const st={ok:['✓','#1B8A5A'],draft:['unconfirmed draft','#0091DA'],stub:['not described yet','#C27A00'],missing:['not on the map yet','#C0392B']};
+  p.innerHTML=`${S.usecases_stale?`<div class="gap" style="margin-bottom:12px"><span>The map changed since these were written.</span><button class="btn sm" id="ugo">Refresh</button></div>`:''}
+    ${u.items.map((x,i)=>`<div class="q"><div><span class="st ${x.ready?'yes':'partial'}">${x.ready?'Ready':'Needs more on the map'}</span><b>${esc(x.title)}</b></div>
+      <div style="margin-top:6px">“${esc(x.question)}”</div>
+      <div class="mute" style="font-size:13px;margin-top:8px"><b>Today:</b> ${esc(x.today)}</div>
+      <div style="font-size:13px;margin-top:4px"><b>With the map:</b> ${esc(x.with_map)}</div>
+      ${x.value?`<div class="mute" style="font-size:13px;margin-top:4px"><b>Why it matters:</b> ${esc(x.value)}</div>`:''}
+      <div style="font-size:12px;margin-top:8px">Relies on: ${x.check.map(c=>`<span style="color:${st[c.state][1]}">${esc(c.name)}${c.state==='ok'?' ✓':' ('+st[c.state][0]+')'}</span>`).join(' · ')||'<span class="mute">nothing specific</span>'}</div>
+      <div style="margin-top:8px"><button class="btn sm try" data-i="${i}">Try it on my map</button></div></div>`).join('')}
+    ${S.usecases_stale?'':'<div style="margin-top:8px"><button class="btn ghost sm" id="ugo">Write new ones</button></div>'}`;
+  const g=$('#ugo');if(g)g.onclick=genUses;
+  p.querySelectorAll('.try').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Checking…';try{const v=await api(`/session/${sid}/arena`,'POST',{question:u.items[+b.dataset.i].question});render(v);setTab('arena');toast(v.question.status==='yes'?'✓ Your map can answer that':'Found '+v.question.gaps.length+' gap(s). Add them to the map.')}catch(e){err(e);b.disabled=false;b.textContent='Try it on my map'}});
+}
+async function genUses(){const b=$('#ugo');b.disabled=true;b.textContent='Writing…';try{render(await api(`/session/${sid}/usecases`,'POST'))}catch(e){err(e);b.disabled=false;b.textContent='Show me use cases'}}
+
 /* ---------------- tabs ---------------- */
 function setTab(t){
   tab=t;document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  ['map','arena','story','hist'].forEach(x=>$('#p-'+x).hidden=x!==t);
-  if(t==='arena')renderArena();if(t==='story')renderStory();if(t==='hist')renderHist();if(t==='map')GR.sync();
+  ['map','arena','uses','story','hist'].forEach(x=>$('#p-'+x).hidden=x!==t);
+  if(t==='uses')renderUses();if(t==='arena')renderArena();if(t==='story')renderStory();if(t==='hist')renderHist();if(t==='map')GR.sync();
 }
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>setTab(b.dataset.t));
 $('#dl').onclick=e=>{e.stopPropagation();$('#dlpop').hidden=!$('#dlpop').hidden};
@@ -473,6 +501,7 @@ function renderStory(){
   if(!s){p.innerHTML=`<h4 style="font-size:16px;margin-top:0">Explain it in plain words</h4><div class="mute">Get a short walkthrough of your map, plus a justification for every design choice, tied to what you told us.</div><button class="btn" id="sgo" style="margin-top:12px" ${S.counts.things<3?'disabled':''}>Explain my map</button>${S.counts.things<3?'<div class="mute" style="margin-top:8px">Add a few more things first.</div>':''}`;
     const b=$('#sgo');if(b)b.onclick=genStory;return}
   p.innerHTML=`${S.story_stale?`<div class="gap" style="margin-bottom:12px"><span>The map changed since this was written.</span><button class="btn sm" id="sgo">Refresh</button></div>`:''}
+    ${S.counts.drafts?`<div class="gap" style="margin-bottom:12px"><span>Partly based on ${S.counts.drafts} draft item(s) the client has not confirmed yet.</span></div>`:''}
     <h2 style="margin:0 0 6px;color:var(--blue)">${esc(s.headline)}</h2>
     <div class="q" style="background:#f6f9ff"><b>In one minute</b><div style="margin-top:4px">${esc(s.one_minute)}</div></div>
     ${(s.sections||[]).map(x=>`<div class="sect"><h4>${esc(x.title)}</h4><div>${esc(x.body)}</div></div>`).join('')}

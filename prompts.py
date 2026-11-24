@@ -33,12 +33,31 @@ NOTES FROM THE TEAM: {about or "(none)"}
 If you recognise this client or its type of business, use your general knowledge (products, sales channels, usual systems, regulation, typical problems) to ask sharper questions and to offer relevant chips. Treat everything you know about them as UNCONFIRMED guesses: phrase it as "I'd expect X, is that right?". Never state facts about the client as certain and never invent figures. Add to the map only what the client confirms in their answers or the team notes say."""
 
 
-def draft_system(client, about, domain, template_note):
+def goals_block(goals):
+    if not goals:
+        return ""
+    return "\nWHAT THE CLIENT WANTS TO FIX (their own picks): " + "; ".join(goals) + ". Steer the questions toward what the map needs in order to solve these, and say so when a question serves one of them."
+
+
+def usecases_system(context_block, goals, client):
+    g = "; ".join(goals) if goals else "(not stated)"
+    return f"""Write practical use cases showing how this business map would be used day to day, for a smart executive who does not know what a map like this is for. Plain business language. Never use these words: {BANNED}
+Client: {client or "(not named)"}
+What they said they want to fix: {g}
+MAP:
+{context_block}
+
+Reply with ONLY JSON:
+{{"usecases":[{{"title":"short, in business terms","question":"the exact question someone in the business would ask, in their words","today":"honest one sentence on how it is usually answered today (teams, files, time)","with_map":"one sentence on how it is answered by following the map","value":"one sentence on why it matters","needs":["ExistingOrNeededClassName"]}}]}}
+Rules: give 4 or 5 use cases, tied to what the client wants to fix when stated. "needs" lists the things from the map the answer relies on, using the exact class names; include a thing the map does not have yet if the use case really needs it. Do not invent figures or time savings."""
+
+
+def draft_system(client, about, domain, template_note, goals=None):
     return f"""You are preparing a STARTING DRAFT of a business map BEFORE a workshop with a client, so the client can react to something instead of a blank page.
 Client: {client}
 Area: {domain}
 Team notes: {about or "(none)"}
-{template_note}
+{template_note}{goals_block(goals)}
 
 If you have a web search tool, use it to read public information about this client (its website, annual report, investor material, products, sales channels, systems and regulation that apply). If you find nothing specific, base the draft on what is typical for this kind of business and say so.
 Everything you produce is an UNCONFIRMED GUESS for the client to confirm or correct. Never invent figures, names of people, or internal systems you have no basis for.
@@ -59,11 +78,11 @@ Draft things: {", ".join(names)}.
 - Things the client adds themselves are confirmed and need no flag."""
 
 
-def interview_system(domain, template_note, stage, context_block, stubs, client="", about="", drafts=None):
+def interview_system(domain, template_note, stage, context_block, stubs, client="", about="", drafts=None, goals=None):
     name, focus = STAGES[stage]
     return f"""You are a friendly senior business analyst running a live workshop with a client who is NOT technical.
 Area being mapped: {domain}.
-{template_note}{client_block(client, about)}{draft_block(drafts)}
+{template_note}{client_block(client, about)}{goals_block(goals)}{draft_block(drafts)}
 
 Never use these words with the client: {BANNED}
 

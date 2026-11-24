@@ -149,6 +149,12 @@ def test_draft_flow():
     v = c.post(f"/api/session/{sid}/confirm", json={"action": "confirm_all"}).json()
     assert not any(x.get("draft") for x in v["classes"]) and v["score"] > 0
     assert c.get(f"/api/session/{sid}/export.xlsx").status_code == 200
+    v = c.post(f"/api/session/{sid}/usecases").json()
+    items = v["usecases"]["items"]
+    assert len(items) >= 3 and all("check" in i for i in items)
+    assert any(not i["ready"] for i in items) and any(i["ready"] for i in items), [i["ready"] for i in items]
+    v2 = c.post("/api/session", json={"domain": "Sales", "client": "Acme", "goals": ["Audits take weeks", "x" * 500, "c", "d"]}).json()
+    assert len(v2["goals"]) == 3 and len(v2["goals"][1]) == 200
     v2 = c.post("/api/session", json={"domain": "Sales", "client": "Acme"}).json()
     assert not any(x.get("draft") for x in v2["classes"])
     print("draft flow ok")
